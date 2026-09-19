@@ -335,6 +335,19 @@ function accountNameMatches(enteredName, accountName) {
 }
 function showToast(message) { const toast = document.querySelector('#toast'); toast.textContent = message; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2600); }
 function updateHostToolsButton() { document.querySelector('#hostToolsButton').textContent = hostAuthenticated ? 'Host tools' : 'Settings'; }
+function setHostPasswordMode(enabled) {
+  const guestFields = document.querySelector('#guestSignInFields');
+  const hostFields = document.querySelector('#hostSignInFields');
+  guestFields.hidden = enabled;
+  hostFields.hidden = !enabled;
+  guestFields.querySelectorAll('input').forEach(input => { input.disabled = enabled; });
+  document.querySelector('#hostPassword').disabled = !enabled;
+  document.querySelector('#signInHeading').textContent = enabled ? 'Enter host password' : "What's your name?";
+  document.querySelector('#signInSubmit').textContent = enabled ? 'Sign in as host' : "Let's get started";
+  document.querySelector('#hostPasswordToggle').textContent = enabled ? 'OR SIGN IN WITH YOUR NAME' : 'OR ENTER PASSWORD';
+  document.querySelector('#accountPasswordError').textContent = '';
+  (enabled ? document.querySelector('#hostPassword') : document.querySelector('#accountFirstName')).focus();
+}
 function ensureAccount(callback) {
   if (guestName) return callback();
   if (hostAuthenticated) {
@@ -435,13 +448,16 @@ function openCustomItem(category) {
 
 document.querySelector('#passwordForm').addEventListener('submit', event => {
   event.preventDefault();
-  const firstName = document.querySelector('#accountFirstName').value.trim();
-  const lastName = document.querySelector('#accountLastName').value.trim();
-  const suffix = document.querySelector('#accountSuffix').value.trim();
-  const accountName = [firstName, lastName, suffix].filter(Boolean).join(' ');
-  if (!lastName && !suffix && normalizeAccountName(firstName) === normalizeAccountName(HOST_PASSWORD)) {
+  const hostPasswordInput = document.querySelector('#hostPassword');
+  if (!hostPasswordInput.disabled) {
+    const password = hostPasswordInput.value.trim();
+    if (password !== HOST_PASSWORD) {
+      document.querySelector('#accountPasswordError').textContent = 'That host password is incorrect.';
+      hostPasswordInput.focus();
+      return;
+    }
     hostAuthenticated = true;
-    hostCredential = firstName;
+    hostCredential = password;
     guestName = HOST_DISPLAY_NAME;
     updateHostToolsButton();
     const action = pendingAccountAction;
@@ -450,12 +466,17 @@ document.querySelector('#passwordForm').addEventListener('submit', event => {
     hostToolsRequested = false;
     document.querySelector('#passwordDialog').close();
     document.querySelector('#accountPasswordError').textContent = '';
+    hostPasswordInput.value = '';
     render();
     if (shouldOpenHostTools) document.querySelector('#hostToolsDialog').showModal();
     else if (action) action();
     else showToast('Host sign-in complete. You can RSVP and bring items as The Host.');
     return;
   }
+  const firstName = document.querySelector('#accountFirstName').value.trim();
+  const lastName = document.querySelector('#accountLastName').value.trim();
+  const suffix = document.querySelector('#accountSuffix').value.trim();
+  const accountName = [firstName, lastName, suffix].filter(Boolean).join(' ');
   if (!firstName || !lastName) { document.querySelector('#accountPasswordError').textContent = 'Enter your first and last name, plus your suffix if you have one.'; return; }
   const account = appState.accounts.find(entry => accountNameMatches(accountName, entry.name));
   if (!account) { document.querySelector('#accountPasswordError').textContent = 'That name and suffix are not recognized.'; return; }
@@ -465,6 +486,9 @@ document.querySelector('#passwordForm').addEventListener('submit', event => {
   document.querySelector('#passwordDialog').close();
   render();
   const action = pendingAccountAction; pendingAccountAction = null; action?.();
+});
+document.querySelector('#hostPasswordToggle').addEventListener('click', () => {
+  setHostPasswordMode(document.querySelector('#hostPassword').disabled);
 });
 document.querySelector('#customItemForm').addEventListener('submit', event => {
   event.preventDefault();

@@ -57,14 +57,18 @@
       <form method="dialog" id="passwordForm" class="modal-card">
         <button class="modal-close" value="cancel" aria-label="Close">×</button>
         <p class="section-kicker">Welcome to the Meyer's table</p>
-        <h2>What's your name?</h2>
-        <div class="name-fields">
+        <h2 id="signInHeading">What's your name?</h2>
+        <div class="name-fields" id="guestSignInFields">
           <label><span>First name</span><input id="accountFirstName" type="text" autocomplete="given-name" required /></label>
           <label><span>Last name</span><input id="accountLastName" type="text" autocomplete="family-name" /></label>
           <label><span>Suffix <small>(if any)</small></span><input id="accountSuffix" type="text" autocomplete="honorific-suffix" placeholder="e.g. Jr. or IV" /></label>
         </div>
+        <div id="hostSignInFields" hidden>
+          <label><span>Host password</span><input id="hostPassword" type="password" autocomplete="current-password" disabled /></label>
+        </div>
         <p class="form-error" id="accountPasswordError" role="alert"></p>
-        <button class="primary-button" value="default">Let's get started</button>
+        <button class="primary-button" id="signInSubmit" value="default">Let's get started</button>
+        <button class="alternate-sign-in" id="hostPasswordToggle" type="button">OR ENTER PASSWORD</button>
       </form>
     </dialog>
 
