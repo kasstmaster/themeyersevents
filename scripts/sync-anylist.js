@@ -1,5 +1,5 @@
 import AnyListModule from 'anylist';
-import { addMissingAccounts, convertCategory } from './anylist-accounts.js';
+import { addMissingAccounts, categoriesFromRawUserData, convertCategory } from './anylist-accounts.js';
 
 const required = name => { if (!process.env[name]) throw new Error(`${name} is not configured.`); return process.env[name]; };
 const ownerRepo = required('STATE_REPOSITORY').split('/');
@@ -40,13 +40,6 @@ function structuredLists(client, loginResult) {
   const candidates = [loginResult?.lists, client.lists, loginResult];
   return asArray(candidates.find(value => asArray(value).length));
 }
-function itemCategoryName(item, categories) {
-  const direct = item?.category?.name ?? item?.categoryName ?? (typeof item?.category === 'string' ? item.category : '');
-  if (direct) return String(direct).trim();
-  const categoryId = item?.categoryId ?? item?.category?.id;
-  return String(categories.find(category => (category?.id ?? category?.identifier) === categoryId)?.name ?? '').trim();
-}
-
 async function run() {
   console.log('AnyList sync started.');
   const email = required('ANYLIST_EMAIL');
@@ -55,29 +48,27 @@ async function run() {
   const AnyList = AnyListModule.AnyList || AnyListModule.default || AnyListModule;
   const client = AnyList.length >= 2 ? new AnyList(email, password) : new AnyList({ email, password });
   let loginResult;
-  try { loginResult = await client.login(); console.log('AnyList authentication succeeded.'); }
+  try { loginResult = await client.login(false); console.log('AnyList authentication succeeded.'); }
   catch (error) { console.error('AnyList authentication failed.'); throw error; }
-  let lists = structuredLists(client, loginResult);
-  if (!lists.length && typeof client.getLists === 'function') {
-    const loadedLists = await client.getLists();
-    lists = asArray(loadedLists).length ? asArray(loadedLists) : structuredLists(client, loginResult);
-  }
+  const loadedLists = await client.getLists();
+  const lists = asArray(loadedLists).length ? asArray(loadedLists) : structuredLists(client, loginResult);
   const list = lists.find(candidate => String(candidate.name).trim().toLocaleLowerCase() === listName.toLocaleLowerCase());
   if (!list) throw new Error(`AnyList list “${listName}” was not found.`);
-  let loadedItems;
-  if (typeof list.getItems === 'function' && !asArray(list.items).length) loadedItems = await list.getItems();
-  const items = asArray(list.items).length ? asArray(list.items) : asArray(loadedItems);
-  const categoryObjects = asArray(list.categories);
-  const categories = categoryObjects.map(category => String(category?.name ?? category).trim()).filter(Boolean);
-  for (const item of items) { const category = itemCategoryName(item, categoryObjects); if (category && !categories.includes(category)) categories.push(category); }
-  console.log(`Address Book found: ${categories.length} categories, ${items.length} actual items, ${items.filter(item => item.notes || item.note || item.description).length} item notes ignored.`);
+  const listId = list.identifier;
+  console.log(`Address Book list ID: ${listId}`);
+  const raw = categoriesFromRawUserData(client._userData, listId);
+  console.log(`Raw items: ${asArray(raw.rawList.items).length}`);
+  console.log(`Category groups: ${raw.groups.length}`);
+  console.log(`Categories discovered (${raw.categories.length}): ${raw.categories.map(category => category.name).join(', ') || '(none)'}`);
+  for (const category of raw.categories) console.log(`Category “${category.name}”: ${category.items.length} assigned item(s)`);
+  console.log(`Unassigned items: ${raw.unassigned}`);
   const accounts = [];
   let skipped = 0;
-  for (const category of categories) {
-    const categoryItems = items.filter(item => itemCategoryName(item, categoryObjects).toLocaleLowerCase() === category.toLocaleLowerCase());
-    const converted = convertCategory(category, categoryItems.map(item => ({ name: item.name })));
+  for (const category of raw.categories) {
+    const converted = convertCategory(category.name, category.items);
     skipped += converted.skipped.length;
     if (converted.account) accounts.push(converted.account); else skipped += 1;
+    console.log(`Category “${category.name}” account: ${converted.account ?? '(none)'}`);
   }
   console.log(`${accounts.length} accounts converted; ${skipped} ambiguous/empty entries skipped.`);
   let added = [];
