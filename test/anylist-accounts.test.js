@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addMissingAccounts, categoriesFromRawUserData, convertCategory } from '../scripts/anylist-accounts.js';
+import {
+  addMissingAccounts, accountPeople, categoriesFromRawUserData, convertCategory,
+  normalizedPerson, syncAnyListAccounts
+} from '../scripts/anylist-accounts.js';
 
 test('converts three households in category order and ignores notes', () => {
   const result = convertCategory('SYSWERDA / HEIL / STEGALL - 2897 Panzl St, Muskegon MI 49444', [
@@ -89,4 +92,65 @@ test('matches a category assignment only on the requested raw list', () => {
 
   const result = categoriesFromRawUserData(userData, 'target');
   assert.deepEqual(result.categories[0].items, [{ name: 'Right Smith' }]);
+});
+
+function category(id, names, heading = 'HALL') {
+  const converted = convertCategory(heading, names.map(name => ({ name })));
+  return { id, ...converted };
+}
+
+test('person removed updates the linked record and preserves selected', () => {
+  const state = { accounts: [{ name: 'Ben Hall IV,Sherri Hall', selected: true, anyListCategoryId: 'hall-123', anyListAnchor: 'Ben Hall IV' }], events: {} };
+  const result = syncAnyListAccounts(state, [category('hall-123', ['Ben Hall IV'])]);
+  assert.deepEqual(result.added, []);
+  assert.equal(state.accounts.length, 1);
+  assert.equal(state.accounts[0].name, 'Ben Hall IV');
+  assert.equal(state.accounts[0].selected, true);
+});
+
+test('person added updates the same linked record', () => {
+  const state = { accounts: [{ name: 'Ben Hall IV,Sherri Hall', selected: false, anyListCategoryId: 'hall-123' }], events: {} };
+  syncAnyListAccounts(state, [category('hall-123', ['Ben Hall IV', 'Sherri Hall', 'Katie Hall'])]);
+  assert.equal(state.accounts.length, 1);
+  assert.deepEqual(accountPeople(state.accounts[0].name), ['Ben Hall IV', 'Sherri Hall', 'Katie Hall']);
+});
+
+test('Roman numeral suffix is part of legacy anchor identity', () => {
+  const state = { accounts: [{ name: 'Ben Hall V', selected: true }, { name: 'Ben Hall IV', selected: false }], events: {} };
+  syncAnyListAccounts(state, [category('hall-123', ['Ben Hall IV', 'Sherri Hall'])]);
+  assert.equal(state.accounts[0].anyListCategoryId, undefined);
+  assert.equal(state.accounts[1].anyListCategoryId, 'hall-123');
+  assert.deepEqual(accountPeople(state.accounts[1].name), ['Ben Hall IV', 'Sherri Hall']);
+});
+
+test('Jr and Sr suffixes are distinct', () => {
+  assert.notEqual(normalizedPerson('Robert Smith Jr.'), normalizedPerson('Robert Smith Sr.'));
+});
+
+test('suffix punctuation is insignificant', () => {
+  assert.equal(normalizedPerson('Robert Smith Jr'), normalizedPerson('Robert Smith Jr.'));
+});
+
+test('renaming during sync migrates every RSVP and claim without losing quantities', () => {
+  const state = {
+    accounts: [{ name: 'Ben Hall IV,Sherri Hall', selected: true, anyListCategoryId: 'hall-123' }],
+    events: {
+      thanksgiving: { rsvps: [{ name: 'Ben Hall IV,Sherri Hall', adults: 2, children: 1 }], items: [{ claims: ['Ben Hall IV,Sherri Hall', 'Ben Hall IV,Sherri Hall', 'Other'] }] },
+      christmas: { rsvps: [{ name: 'Ben Hall IV,Sherri Hall', adults: 1, children: 0 }], items: [{ claims: ['Ben Hall IV,Sherri Hall'] }] }
+    }
+  };
+  syncAnyListAccounts(state, [category('hall-123', ['Ben Hall IV'])]);
+  assert.deepEqual(state.events.thanksgiving.rsvps, [{ name: 'Ben Hall IV', adults: 2, children: 1 }]);
+  assert.deepEqual(state.events.thanksgiving.items[0].claims, ['Ben Hall IV', 'Ben Hall IV', 'Other']);
+  assert.equal(state.events.christmas.rsvps[0].name, 'Ben Hall IV');
+  assert.deepEqual(state.events.christmas.items[0].claims, ['Ben Hall IV']);
+});
+
+test('category ID wins when the prior anchor was removed', () => {
+  const state = { accounts: [{ name: 'Ben Hall IV,Sherri Hall', selected: true, anyListCategoryId: 'hall-123', anyListAnchor: 'Ben Hall IV' }], events: {} };
+  syncAnyListAccounts(state, [category('hall-123', ['Sherri Hall'])]);
+  assert.equal(state.accounts.length, 1);
+  assert.equal(state.accounts[0].name, 'Sherri Hall');
+  assert.equal(state.accounts[0].anyListAnchor, 'Sherri Hall');
+  assert.equal(state.accounts[0].selected, true);
 });

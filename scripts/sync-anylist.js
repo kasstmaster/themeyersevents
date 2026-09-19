@@ -1,5 +1,5 @@
 import AnyListModule from 'anylist';
-import { addMissingAccounts, categoriesFromRawUserData, convertCategory } from './anylist-accounts.js';
+import { categoriesFromRawUserData, convertCategory, syncAnyListAccounts } from './anylist-accounts.js';
 
 const required = name => { if (!process.env[name]) throw new Error(`${name} is not configured.`); return process.env[name]; };
 const ownerRepo = required('STATE_REPOSITORY').split('/');
@@ -67,23 +67,21 @@ async function run() {
   for (const category of raw.categories) {
     const converted = convertCategory(category.name, category.items);
     skipped += converted.skipped.length;
-    if (converted.account) accounts.push(converted.account); else skipped += 1;
+    if (converted.account) accounts.push({ ...converted, id: category.id }); else skipped += 1;
     console.log(`Category “${category.name}” account: ${converted.account ?? '(none)'}`);
   }
   console.log(`${accounts.length} accounts converted; ${skipped} ambiguous/empty entries skipped.`);
-  let added = [];
+  let outcome = { added: [], updated: [] };
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const current = await getFile(statePath);
     const state = current.value;
     if (!Array.isArray(state.accounts)) throw new Error('Current state has no accounts array.');
-    const before = state.accounts.length;
-    added = addMissingAccounts(state, accounts);
-    console.log(`${accounts.length - added.length} converted accounts already exist; ${added.length} will be added.`);
-    if (!added.length) break;
-    try { await putFile(statePath, state, `Add ${added.length} account(s) from AnyList`, current.sha); console.log('Account state saved successfully.'); break; }
+    outcome = syncAnyListAccounts(state, accounts);
+    console.log(`${outcome.updated.length} account(s) updated; ${outcome.added.length} added.`);
+    try { await putFile(statePath, state, `Sync ${accounts.length} account(s) from AnyList`, current.sha); console.log('Account state saved successfully.'); break; }
     catch (error) { if (!error.message.includes('(409)') || attempt === 2) throw error; console.log('State changed concurrently; retrying against the latest SHA.'); }
   }
-  await writeStatus({ state: 'complete', added: added.length, skipped, finishedAt: new Date().toISOString() });
+  await writeStatus({ state: 'complete', added: outcome.added.length, updated: outcome.updated.length, skipped, finishedAt: new Date().toISOString() });
 }
 
 run().catch(async error => {

@@ -291,10 +291,7 @@ function householdDisplayName(value) {
   const name = value.trim();
   if (!name || name === HOST_DISPLAY_NAME) return name;
   if (/^the\s+/i.test(name)) return name.replace(/^the\s+/i, 'The ');
-  const firstHousehold = name.split('/')[0].trim();
-  const lastName = firstHousehold.includes(' ')
-    ? firstHousehold.slice(firstHousehold.lastIndexOf(' ') + 1)
-    : firstHousehold;
+  const lastName = firstAccountLastName(name);
   if (/['’]$/.test(lastName)) return `The ${lastName}`;
   return `The ${lastName}${/s$/i.test(lastName) ? "'" : 's'}`;
 }
@@ -316,6 +313,8 @@ function removeItemClaims(item, claimant, quantity) {
 function accountSignInNames(accountName) {
   return accountName.split('/').flatMap(household => {
     const entry = household.trim();
+    const explicitNames = entry.split(',').map(name => name.trim()).filter(Boolean);
+    if (explicitNames.length > 1 && explicitNames.every(name => name.split(/\s+/).length >= 2)) return explicitNames;
     const lastSpace = entry.lastIndexOf(' ');
     if (lastSpace < 0) return [entry];
     const lastName = entry.slice(lastSpace + 1).trim();
@@ -323,6 +322,12 @@ function accountSignInNames(accountName) {
       .map(firstName => `${firstName.trim()} ${lastName}`)
       .filter(name => name.length > lastName.length + 1);
   });
+}
+function firstAccountLastName(accountName) {
+  const firstPerson = accountSignInNames(accountName)[0] || accountName;
+  const words = firstPerson.trim().split(/\s+/);
+  if (words.length > 2 && /^(?:jr\.?|sr\.?|[ivxlcdm]+)$/i.test(words.at(-1))) words.pop();
+  return words.at(-1) || '';
 }
 function accountNameMatches(enteredName, accountName) {
   const normalizedEntry = normalizeAccountName(enteredName);
@@ -547,7 +552,10 @@ function renderQuantityUnits() {
 }
 function openAccountsAdmin() {
   document.querySelector('#adminAccountError').textContent = '';
-  document.querySelector('#adminAccounts').innerHTML = appState.accounts.length ? appState.accounts.map((account, index) => `<div class="account-row" data-account-index="${index}"><label class="account-selection"><input type="checkbox" ${account.selected ? 'checked' : ''}><span>Can sign in</span></label><input value="${escapeAttribute(account.name)}" maxlength="120" aria-label="Account name"><button type="button" aria-label="Delete ${escapeAttribute(account.name)} account">×</button></div>`).join('') : '<p class="guest-empty">No guest accounts yet.</p>';
+  const sortedAccounts = appState.accounts.map((account, index) => ({ account, index })).sort((left, right) =>
+    firstAccountLastName(left.account.name).localeCompare(firstAccountLastName(right.account.name), 'en-US', { sensitivity: 'base' })
+    || left.account.name.localeCompare(right.account.name, 'en-US', { sensitivity: 'base' }));
+  document.querySelector('#adminAccounts').innerHTML = sortedAccounts.length ? sortedAccounts.map(({ account, index }) => `<div class="account-row" data-account-index="${index}"><label class="account-selection"><input type="checkbox" ${account.selected ? 'checked' : ''}><span>Can sign in</span></label><input value="${escapeAttribute(account.name)}" maxlength="120" aria-label="Account name"><button type="button" aria-label="Delete ${escapeAttribute(account.name)} account">×</button></div>`).join('') : '<p class="guest-empty">No guest accounts yet.</p>';
   document.querySelectorAll('.account-row').forEach(row => {
     const [selection, name, remove] = row.children;
     selection.querySelector('input').addEventListener('change', event => {
