@@ -103,7 +103,11 @@ function normalizeState(saved) {
         ...fresh,
         ...saved,
         activeEventId: saved.events[saved.activeEventId] ? saved.activeEventId : 'thanksgiving',
-        accounts: (saved.accounts || fresh.accounts).map(account => ({ ...account, selected: account.selected !== false })),
+        accounts: (saved.accounts || fresh.accounts).map(account => ({
+          ...account,
+          alwaysInvite: account.alwaysInvite === true,
+          selected: account.alwaysInvite === true || account.selected !== false
+        })),
         events: { ...fresh.events, ...saved.events }
       };
       if (loaded.events.christmas.menuVersion !== CHRISTMAS_MENU_VERSION) {
@@ -298,6 +302,9 @@ function householdDisplayName(value) {
 function contributionDisplayName(value) {
   return value.trim() === HOST_DISPLAY_NAME ? 'Host' : householdDisplayName(value);
 }
+function invitedAccountDisplayName(value) {
+  return value.split('/').map(household => householdDisplayName(household)).join(' / ');
+}
 function hostFirstRsvps(rsvps) {
   return [...rsvps].sort((a, b) => Number(b.name === HOST_DISPLAY_NAME) - Number(a.name === HOST_DISPLAY_NAME));
 }
@@ -391,13 +398,19 @@ function render() {
   const claimed = state.items.reduce((sum, item) => sum + item.claims.length, 0);
   const needed = state.items.reduce((sum, item) => sum + (item.optional ? 0 : Math.max(0, item.needed - item.claims.length)), 0);
   const guests = state.rsvps.reduce((sum, rsvp) => sum + rsvp.adults + rsvp.children, 0);
+  const invitedAccounts = appState.accounts.filter(account => account.selected);
   document.querySelector('#dishCount').textContent = claimed;
   document.querySelector('#guestCount').textContent = guests;
+  document.querySelector('#invitedCount').textContent = invitedAccounts.length;
   document.querySelector('#remainingCount').textContent = needed;
   const guestListButton = document.querySelector('#guestListButton');
   guestListButton.disabled = !hostAuthenticated;
   guestListButton.title = hostAuthenticated ? 'View guest names and RSVP details' : 'Guest details are private to the host';
   guestListButton.setAttribute('aria-label', hostAuthenticated ? `${guests} guests attending; view private guest list` : `${guests} guests attending; details visible only to the host`);
+  const invitedListButton = document.querySelector('#invitedListButton');
+  invitedListButton.disabled = !hostAuthenticated;
+  invitedListButton.title = hostAuthenticated ? 'View invited families' : 'Invited family details are private to the host';
+  invitedListButton.setAttribute('aria-label', hostAuthenticated ? `${invitedAccounts.length} families invited; view private invitation list` : `${invitedAccounts.length} families invited; details visible only to the host`);
   document.querySelectorAll('[data-claim]').forEach(button => button.addEventListener('click', () => claimItem(button.dataset.claim)));
   document.querySelectorAll('[data-custom-category]').forEach(button => button.addEventListener('click', () => openCustomItem(button.dataset.customCategory)));
 }
@@ -541,6 +554,16 @@ document.querySelector('#guestListButton').addEventListener('click', () => {
   list.innerHTML = state.rsvps.length ? hostFirstRsvps(state.rsvps).map(rsvp => `<div class="guest-entry"><strong>${escapeHtml(contributionDisplayName(rsvp.name))}</strong><span>${rsvp.adults} adult${rsvp.adults === 1 ? '' : 's'} · ${rsvp.children} child${rsvp.children === 1 ? '' : 'ren'}</span></div>`).join('') : '<p class="guest-empty">No guests have RSVP’d yet.</p>';
   document.querySelector('#guestListDialog').showModal();
 });
+document.querySelector('#invitedListButton').addEventListener('click', () => {
+  if (!hostAuthenticated) return;
+  const invitedAccounts = appState.accounts
+    .filter(account => account.selected)
+    .sort((left, right) => left.name.localeCompare(right.name));
+  document.querySelector('#invitedList').innerHTML = invitedAccounts.length
+    ? invitedAccounts.map(account => `<div class="guest-entry"><strong>${escapeHtml(invitedAccountDisplayName(account.name))}</strong></div>`).join('')
+    : '<p class="guest-empty">No families are currently invited.</p>';
+  document.querySelector('#invitedListDialog').showModal();
+});
 function openAdmin() {
   document.querySelector('#adminEventDate').value = state.eventDate;
   document.querySelector('#adminNewUnit').innerHTML = unitOptions();
@@ -583,13 +606,20 @@ function openAccountsAdmin() {
   const sortedAccounts = appState.accounts.map((account, index) => ({ account, index })).sort((left, right) =>
     firstAccountLastName(left.account.name).localeCompare(firstAccountLastName(right.account.name), 'en-US', { sensitivity: 'base' })
     || left.account.name.localeCompare(right.account.name, 'en-US', { sensitivity: 'base' }));
-  document.querySelector('#adminAccounts').innerHTML = sortedAccounts.length ? sortedAccounts.map(({ account, index }) => `<div class="account-row" data-account-index="${index}"><label class="account-selection"><input type="checkbox" ${account.selected ? 'checked' : ''}><span>Can sign in</span></label><input value="${escapeAttribute(account.name)}" maxlength="120" aria-label="Account name"><button type="button" aria-label="Delete ${escapeAttribute(account.name)} account">×</button></div>`).join('') : '<p class="guest-empty">No guest accounts yet.</p>';
+  document.querySelector('#adminAccounts').innerHTML = sortedAccounts.length ? sortedAccounts.map(({ account, index }) => `<div class="account-row" data-account-index="${index}"><div class="account-access"><label class="account-selection"><input class="account-selected" type="checkbox" ${account.selected ? 'checked' : ''} ${account.alwaysInvite ? 'disabled' : ''}><span>Can sign in</span></label><label class="account-selection"><input class="account-always-invite" type="checkbox" ${account.alwaysInvite ? 'checked' : ''}><span>Always Invite</span></label></div><input value="${escapeAttribute(account.name)}" maxlength="120" aria-label="Account name"><button type="button" aria-label="Delete ${escapeAttribute(account.name)} account">×</button></div>`).join('') : '<p class="guest-empty">No guest accounts yet.</p>';
   document.querySelectorAll('.account-row').forEach(row => {
-    const [selection, name, remove] = row.children;
-    selection.querySelector('input').addEventListener('change', event => {
+    const [access, name, remove] = row.children;
+    access.querySelector('.account-selected').addEventListener('change', event => {
       appState.accounts[Number(row.dataset.accountIndex)].selected = event.target.checked;
       if (!event.target.checked && guestName === appState.accounts[Number(row.dataset.accountIndex)].name) guestName = '';
       saveState();
+    });
+    access.querySelector('.account-always-invite').addEventListener('change', event => {
+      const account = appState.accounts[Number(row.dataset.accountIndex)];
+      account.alwaysInvite = event.target.checked;
+      if (account.alwaysInvite) account.selected = true;
+      saveState();
+      openAccountsAdmin();
     });
     name.addEventListener('change', () => renameAccount(Number(row.dataset.accountIndex), name));
     remove.addEventListener('click', () => {
@@ -761,7 +791,7 @@ document.querySelector('#adminAddAccountButton').addEventListener('click', () =>
   const name = input.value.trim();
   if (!name) { document.querySelector('#adminAccountError').textContent = 'Enter a last name.'; return; }
   if (appState.accounts.some(account => normalizeAccountName(account.name) === normalizeAccountName(name))) { document.querySelector('#adminAccountError').textContent = 'That account already exists.'; return; }
-  appState.accounts.push({ name, selected: false }); input.value = ''; saveState(); openAccountsAdmin(); showToast(`${householdDisplayName(name)} account added. Enable it to allow sign-in.`);
+  appState.accounts.push({ name, selected: false, alwaysInvite: false }); input.value = ''; saveState(); openAccountsAdmin(); showToast(`${householdDisplayName(name)} account added. Enable it to allow sign-in.`);
 });
 document.querySelector('#adminEventDate').addEventListener('change', event => { if (!event.target.value) return; state.eventDate = event.target.value; state.accountSelectionResetFor = ''; saveState(); showToast('Event date updated.'); });
 document.querySelector('#adminAddUnitButton').addEventListener('click', () => {
