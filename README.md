@@ -153,4 +153,3 @@ read and write the live state in `kasstmaster/themeyersevents-data`.
 Then deploy the Worker manually and push the workflow. No deployment is
 performed by this repository change. Sync logs include counts and outcomes but
 never credentials, cookies, authorization headers, or token values.
-
