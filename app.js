@@ -882,7 +882,7 @@ document.addEventListener('visibilitychange', () => {
 });
 if (SHARED_STATE_URL) setInterval(loadSharedState, 30000);
 
-// Let the wedding header's embroidered dots glint only while the page moves.
+// Let the wedding header sparkle only while the page moves.
 const siteHeader = document.querySelector('.site-header');
 let scrollSparkleTimer;
 window.addEventListener('scroll', () => {
