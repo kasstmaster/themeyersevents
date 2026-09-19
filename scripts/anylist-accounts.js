@@ -1,6 +1,31 @@
 function clean(value) { return String(value ?? '').trim().replace(/\s+/g, ' '); }
 function key(value) { return clean(value).toLocaleLowerCase('en-US'); }
 
+const GENERATIONAL_SUFFIX = /^(?:jr\.?|sr\.?|[ivxlcdm]+)$/i;
+
+function canonicalSuffix(value) {
+  const suffix = clean(value).replace(/\.$/, '');
+  return /^(?:jr|sr)$/i.test(suffix) ? suffix.toLocaleLowerCase('en-US') : suffix.toUpperCase();
+}
+
+/** Parse a conventional full name without mistaking a generational suffix for its surname. */
+export function parsePerson(value) {
+  const fullName = clean(value);
+  const words = fullName.split(' ').filter(Boolean);
+  if (words.length < 2) return null;
+  const hasSuffix = words.length > 2 && GENERATIONAL_SUFFIX.test(words.at(-1));
+  const suffix = hasSuffix ? canonicalSuffix(words.pop()) : '';
+  const surname = words.pop();
+  const givenNames = words.join(' ');
+  if (!givenNames || !surname) return null;
+  return { givenNames, surname, suffix, fullName };
+}
+
+export function normalizedPerson(value) {
+  const person = parsePerson(value);
+  return person ? [key(person.givenNames), key(person.surname), canonicalSuffix(person.suffix)].join('\0') : '';
+}
+
 function asArray(value) {
   if (Array.isArray(value)) return value;
   if (value instanceof Map) return [...value.values()];
@@ -29,47 +54,35 @@ function sortedItems(rawList) {
   return sorted(items);
 }
 
-/**
- * Reconstruct category membership from the decoded protobuf data. The anylist
- * package's public List and Item wrappers intentionally omit these fields.
- */
+/** Reconstruct category membership from decoded protobuf fields omitted by the public wrappers. */
 export function categoriesFromRawUserData(userData, listId) {
   const shoppingLists = userData?.shoppingListsResponse;
   const rawList = [...asArray(shoppingLists?.newLists), ...asArray(shoppingLists?.modifiedLists)]
     .find(list => String(list?.identifier) === String(listId));
   if (!rawList) throw new Error(`Raw AnyList shopping list ${listId} was not found.`);
-
-  const listResponse = asArray(shoppingLists?.listResponses)
-    .find(response => String(response?.listId) === String(listId));
+  const listResponse = asArray(shoppingLists?.listResponses).find(response => String(response?.listId) === String(listId));
   if (!listResponse) throw new Error(`Raw AnyList category response for list ${listId} was not found.`);
 
   const groups = sorted(listResponse.categoryGroupResponses?.map(response => response?.categoryGroup).filter(Boolean));
   const categories = groups.flatMap(group => sorted(group.categories).map(category => ({
-    id: category?.identifier,
-    groupId: category?.categoryGroupId ?? group?.identifier,
-    name: clean(category?.name),
-    sortIndex: category?.sortIndex,
-    items: []
+    id: category?.identifier, groupId: category?.categoryGroupId ?? group?.identifier,
+    name: clean(category?.name), sortIndex: category?.sortIndex, items: []
   }))).filter(category => category.id != null && category.name);
-
   const categoryByAssignment = new Map(categories.map(category => [`${category.groupId ?? ''}\0${category.id}`, category]));
   const categoryById = new Map(categories.map(category => [String(category.id), category]));
-  const rawItems = sortedItems(rawList);
   let unassigned = 0;
-  for (const item of rawItems) {
+  for (const item of sortedItems(rawList)) {
     let assigned = false;
     for (const assignment of asArray(item?.categoryAssignments)) {
       const compositeKey = `${assignment?.categoryGroupId ?? ''}\0${assignment?.categoryId}`;
       const category = categoryByAssignment.get(compositeKey)
         ?? (assignment?.categoryGroupId == null ? categoryById.get(String(assignment?.categoryId)) : undefined);
       if (!category) continue;
-      // Deliberately copy only the name; details is the user's private note field.
-      category.items.push({ name: item?.name });
+      category.items.push({ name: item?.name }); // Never copy the private details/notes field.
       assigned = true;
     }
     if (!assigned) unassigned += 1;
   }
-
   return { rawList, listResponse, groups, categories, unassigned };
 }
 
@@ -81,48 +94,96 @@ export function convertCategory(categoryName, items) {
   const householdNames = categoryHouseholds(categoryName);
   const households = householdNames.map(lastName => ({ lastName, people: [] }));
   const skipped = [];
+  const orderedPeople = [];
   for (const item of items) {
-    // Deliberately read only the structured item name. notes/details are never candidates.
     const fullName = clean(item?.name);
-    const matches = householdNames
-      .map((lastName, index) => ({ lastName, index }))
-      .filter(({ lastName }) => key(fullName).endsWith(` ${key(lastName)}`));
-    if (matches.length !== 1) { skipped.push(fullName || '(unnamed item)'); continue; }
+    const person = parsePerson(fullName);
+    const matches = person ? householdNames.map((lastName, index) => ({ lastName, index }))
+      .filter(({ lastName }) => key(person.surname) === key(lastName)) : [];
+    if (matches.length !== 1 || /[,/]/.test(person?.givenNames || '')) { skipped.push(fullName || '(unnamed item)'); continue; }
     const match = matches[0];
-    const givenName = clean(fullName.slice(0, fullName.length - match.lastName.length));
-    if (!givenName || /[,/]/.test(givenName)) { skipped.push(fullName); continue; }
-    // Keep the person's spelling/capitalization rather than replacing it with the header hint.
-    const displayedLastName = clean(fullName.slice(fullName.length - match.lastName.length));
-    households[match.index].lastName = displayedLastName;
-    households[match.index].people.push(givenName);
+    households[match.index].lastName = person.surname;
+    households[match.index].people.push(person);
+    orderedPeople.push(person.fullName);
   }
   const populated = households.filter(household => household.people.length);
-  return {
-    account: populated.length ? populated.map(({ lastName, people }) => `${people.join(',')} ${lastName}`).join('/') : null,
-    skipped
-  };
+  const account = populated.length ? populated.map(({ lastName, people }) => {
+    // Suffix-bearing names use an explicit full-name list; the legacy compact form cannot
+    // otherwise say which household member owns the suffix.
+    if (people.some(person => person.suffix)) return people.map(person => person.fullName).join(',');
+    return `${people.map(person => person.givenNames).join(',')} ${lastName}`;
+  }).join('/') : null;
+  return { account, anchor: orderedPeople[0] || null, people: orderedPeople, skipped };
+}
+
+/** Expand both legacy compact households and explicit comma-separated full names. */
+export function accountPeople(accountName) {
+  return clean(accountName).split('/').flatMap(part => {
+    const entries = clean(part).split(',').map(clean).filter(Boolean);
+    if (!entries.length) return [];
+    const parsed = entries.map(parsePerson);
+    if (parsed.every(Boolean)) return entries;
+    const final = parsePerson(entries.at(-1));
+    if (!final) return [];
+    return entries.map((entry, index) => index === entries.length - 1
+      ? entry
+      : `${entry} ${final.surname}`);
+  });
 }
 
 export function normalizedAccountPeople(accountName) {
-  const people = clean(accountName).split('/').flatMap(part => {
-    const household = clean(part);
-    const boundary = household.lastIndexOf(' ');
-    if (boundary < 1) return [key(household)];
-    const lastName = clean(household.slice(boundary + 1));
-    return household.slice(0, boundary).split(',').map(first => key(`${clean(first)} ${lastName}`));
-  }).filter(Boolean);
-  return [...new Set(people)].sort().join('|');
+  return [...new Set(accountPeople(accountName).map(normalizedPerson).filter(Boolean))].sort().join('|');
 }
 
+function migrateAccountReferences(state, oldName, newName) {
+  if (oldName === newName) return;
+  Object.values(state.events || {}).forEach(event => {
+    (event.items || []).forEach(item => { item.claims = (item.claims || []).map(name => name === oldName ? newName : name); });
+    (event.rsvps || []).forEach(rsvp => { if (rsvp.name === oldName) rsvp.name = newName; });
+  });
+}
+
+/** Reconcile AnyList categories into accounts, preserving all website-owned account fields. */
+export function syncAnyListAccounts(state, categories) {
+  const claimedIndexes = new Set();
+  const added = [];
+  const updated = [];
+  for (const category of categories) {
+    if (!category.account || !category.anchor) continue;
+    const categoryId = String(category.id);
+    let index = state.accounts.findIndex(account => String(account.anyListCategoryId ?? '') === categoryId);
+    if (index < 0) {
+      const anchor = normalizedPerson(category.anchor);
+      index = state.accounts.findIndex((account, candidateIndex) => !claimedIndexes.has(candidateIndex)
+        && !account.anyListCategoryId
+        && accountPeople(account.name).some(person => normalizedPerson(person) === anchor));
+    }
+    if (index < 0) {
+      state.accounts.push({ name: category.account, selected: false, anyListCategoryId: categoryId, anyListAnchor: category.anchor });
+      claimedIndexes.add(state.accounts.length - 1);
+      added.push(category.account);
+      continue;
+    }
+    claimedIndexes.add(index);
+    const account = state.accounts[index];
+    const oldName = account.name;
+    account.name = category.account;
+    account.anyListCategoryId = categoryId;
+    account.anyListAnchor = category.anchor;
+    migrateAccountReferences(state, oldName, account.name);
+    updated.push(account.name);
+  }
+  return { added, updated };
+}
+
+// Kept for callers that only have names; new sync code uses syncAnyListAccounts.
 export function addMissingAccounts(state, convertedAccounts) {
   const existing = new Set(state.accounts.map(account => normalizedAccountPeople(account.name)));
   const added = [];
   for (const name of convertedAccounts) {
     const normalized = normalizedAccountPeople(name);
     if (!normalized || existing.has(normalized)) continue;
-    state.accounts.push({ name, selected: false });
-    existing.add(normalized);
-    added.push(name);
+    state.accounts.push({ name, selected: false }); existing.add(normalized); added.push(name);
   }
   return added;
 }
