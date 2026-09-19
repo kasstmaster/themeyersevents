@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addMissingAccounts, convertCategory } from '../scripts/anylist-accounts.js';
+import { addMissingAccounts, categoriesFromRawUserData, convertCategory } from '../scripts/anylist-accounts.js';
 
 test('converts three households in category order and ignores notes', () => {
   const result = convertCategory('SYSWERDA / HEIL / STEGALL - 2897 Panzl St, Muskegon MI 49444', [
@@ -39,4 +39,54 @@ test('ambiguous items are skipped rather than guessed', () => {
   const result = convertCategory('SMITH / JONES', [{ name: 'Prince' }, { name: 'Alex Smith' }]);
   assert.equal(result.account, 'Alex Smith');
   assert.deepEqual(result.skipped, ['Prince']);
+});
+
+test('reconstructs ordered categories and item membership from raw AnyList data', () => {
+  const userData = {
+    shoppingListsResponse: {
+      newLists: [{
+        identifier: 'address-book-id',
+        name: 'Address Book',
+        items: [
+          { name: 'Second Smith', details: 'private note', manualSortIndex: 20, categoryAssignments: [{ categoryGroupId: 'people', categoryId: 'smith' }] },
+          { name: 'Nobody Jones', manualSortIndex: 15, categoryAssignments: [] },
+          { name: 'First Smith', manualSortIndex: 10, categoryAssignments: [{ categoryGroupId: 'people', categoryId: 'smith' }] },
+          { name: 'Amy Adams', manualSortIndex: 5, categoryAssignments: [{ categoryGroupId: 'people', categoryId: 'adams' }] }
+        ]
+      }],
+      listResponses: [{
+        listId: 'address-book-id',
+        categoryGroupResponses: [{ categoryGroup: {
+          identifier: 'people',
+          categories: [
+            { identifier: 'smith', categoryGroupId: 'people', name: 'SMITH - Main St', sortIndex: 20 },
+            { identifier: 'adams', categoryGroupId: 'people', name: 'ADAMS', sortIndex: 10 }
+          ]
+        } }]
+      }]
+    }
+  };
+
+  const result = categoriesFromRawUserData(userData, 'address-book-id');
+  assert.deepEqual(result.categories.map(category => category.name), ['ADAMS', 'SMITH - Main St']);
+  assert.deepEqual(result.categories[1].items, [{ name: 'First Smith' }, { name: 'Second Smith' }]);
+  assert.equal(result.unassigned, 1);
+  assert.doesNotMatch(JSON.stringify(result.categories), /private note/);
+});
+
+test('matches a category assignment only on the requested raw list', () => {
+  const userData = {
+    shoppingListsResponse: {
+      newLists: [
+        { identifier: 'other', items: [{ name: 'Wrong Smith', categoryAssignments: [{ categoryGroupId: 'group', categoryId: 'cat' }] }] },
+        { identifier: 'target', items: [{ name: 'Right Smith', categoryAssignments: [{ categoryGroupId: 'group', categoryId: 'cat' }] }] }
+      ],
+      listResponses: [{ listId: 'target', categoryGroupResponses: [{ categoryGroup: {
+        identifier: 'group', categories: [{ identifier: 'cat', name: 'SMITH' }]
+      } }] }]
+    }
+  };
+
+  const result = categoriesFromRawUserData(userData, 'target');
+  assert.deepEqual(result.categories[0].items, [{ name: 'Right Smith' }]);
 });
