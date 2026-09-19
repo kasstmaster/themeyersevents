@@ -1,7 +1,9 @@
 function clean(value) { return String(value ?? '').trim().replace(/\s+/g, ' '); }
 function key(value) { return clean(value).toLocaleLowerCase('en-US'); }
 
-const GENERATIONAL_SUFFIX = /^(?:jr\.?|sr\.?|[ivxlcdm]+)$/i;
+// This intentionally enumerates the supported Roman numerals instead of accepting
+// arbitrary strings made from Roman-numeral letters (for example, "Liv").
+const GENERATIONAL_SUFFIX = /^(?:jr\.?|sr\.?|i|ii|iii|iv|v|vi|vii|viii|ix|x)$/i;
 
 function canonicalSuffix(value) {
   const suffix = clean(value).replace(/\.$/, '');
@@ -92,21 +94,28 @@ export function categoryHouseholds(categoryName) {
 
 export function convertCategory(categoryName, items) {
   const householdNames = categoryHouseholds(categoryName);
-  const households = householdNames.map(lastName => ({ lastName, people: [] }));
+  const householdOrder = new Map(householdNames.map((lastName, index) => [key(lastName), index]));
+  const households = new Map();
   const skipped = [];
   const orderedPeople = [];
   for (const item of items) {
     const fullName = clean(item?.name);
     const person = parsePerson(fullName);
-    const matches = person ? householdNames.map((lastName, index) => ({ lastName, index }))
-      .filter(({ lastName }) => key(person.surname) === key(lastName)) : [];
-    if (matches.length !== 1 || /[,/]/.test(person?.givenNames || '')) { skipped.push(fullName || '(unnamed item)'); continue; }
-    const match = matches[0];
-    households[match.index].lastName = person.surname;
-    households[match.index].people.push(person);
+    if (!person || /[,/]/.test(person.givenNames)) { skipped.push(fullName || '(unnamed item)'); continue; }
+    const surnameKey = key(person.surname);
+    if (!households.has(surnameKey)) households.set(surnameKey, {
+      lastName: person.surname,
+      people: [],
+      headingIndex: householdOrder.get(surnameKey) ?? Number.POSITIVE_INFINITY,
+      discoveredIndex: households.size
+    });
+    households.get(surnameKey).people.push(person);
     orderedPeople.push(person.fullName);
   }
-  const populated = households.filter(household => household.people.length);
+  // The heading remains only an ordering hint. Membership and surnames come from
+  // the people, so renaming an AnyList category cannot change its identity.
+  const populated = [...households.values()].sort((left, right) =>
+    left.headingIndex - right.headingIndex || left.discoveredIndex - right.discoveredIndex);
   const account = populated.length ? populated.map(({ lastName, people }) => {
     // Suffix-bearing names use an explicit full-name list; the legacy compact form cannot
     // otherwise say which household member owns the suffix.
@@ -148,18 +157,32 @@ export function syncAnyListAccounts(state, categories) {
   const claimedIndexes = new Set();
   const added = [];
   const updated = [];
+  const skipped = [];
   for (const category of categories) {
-    if (!category.account || !category.anchor) continue;
+    if (!category.account || !category.anchor || category.id == null) continue;
     const categoryId = String(category.id);
-    let index = state.accounts.findIndex(account => String(account.anyListCategoryId ?? '') === categoryId);
+    const linked = state.accounts.map((account, index) => ({ account, index }))
+      .filter(({ account }) => account.anyListCategoryId != null && String(account.anyListCategoryId) === categoryId);
+    if (linked.length > 1) { skipped.push(categoryId); continue; }
+    let index = linked[0]?.index ?? -1;
     if (index < 0) {
-      const anchor = normalizedPerson(category.anchor);
-      index = state.accounts.findIndex((account, candidateIndex) => !claimedIndexes.has(candidateIndex)
-        && !account.anyListCategoryId
-        && accountPeople(account.name).some(person => normalizedPerson(person) === anchor));
+      const categoryPeople = new Set(category.people.map(normalizedPerson).filter(Boolean));
+      const candidates = state.accounts.map((account, candidateIndex) => {
+        const people = new Set(accountPeople(account.name).map(normalizedPerson).filter(Boolean));
+        const overlap = [...categoryPeople].filter(person => people.has(person)).length;
+        const exact = overlap === categoryPeople.size && overlap === people.size;
+        return { candidateIndex, overlap, exact };
+      }).filter(candidate => !claimedIndexes.has(candidate.candidateIndex)
+        && !state.accounts[candidate.candidateIndex].anyListCategoryId
+        && candidate.overlap > 0);
+      const exact = candidates.filter(candidate => candidate.exact);
+      const bestOverlap = Math.max(0, ...candidates.map(candidate => candidate.overlap));
+      const best = exact.length ? exact : candidates.filter(candidate => candidate.overlap === bestOverlap);
+      if (best.length > 1) { skipped.push(categoryId); continue; }
+      index = best[0]?.candidateIndex ?? -1;
     }
     if (index < 0) {
-      state.accounts.push({ name: category.account, selected: false, anyListCategoryId: categoryId, anyListAnchor: category.anchor });
+      state.accounts.push({ name: category.account, selected: false, anyListCategoryId: categoryId });
       claimedIndexes.add(state.accounts.length - 1);
       added.push(category.account);
       continue;
@@ -169,11 +192,10 @@ export function syncAnyListAccounts(state, categories) {
     const oldName = account.name;
     account.name = category.account;
     account.anyListCategoryId = categoryId;
-    account.anyListAnchor = category.anchor;
     migrateAccountReferences(state, oldName, account.name);
     updated.push(account.name);
   }
-  return { added, updated };
+  return { added, updated, skipped };
 }
 
 // Kept for callers that only have names; new sync code uses syncAnyListAccounts.

@@ -326,7 +326,7 @@ function accountSignInNames(accountName) {
 function firstAccountLastName(accountName) {
   const firstPerson = accountSignInNames(accountName)[0] || accountName;
   const words = firstPerson.trim().split(/\s+/);
-  if (words.length > 2 && /^(?:jr\.?|sr\.?|[ivxlcdm]+)$/i.test(words.at(-1))) words.pop();
+  if (words.length > 2 && /^(?:jr\.?|sr\.?|i|ii|iii|iv|v|vi|vii|viii|ix|x)$/i.test(words.at(-1))) words.pop();
   return words.at(-1) || '';
 }
 function accountNameMatches(enteredName, accountName) {
