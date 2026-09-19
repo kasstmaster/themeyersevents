@@ -70,14 +70,17 @@ dialog{border:0;padding:0;background:transparent;max-width:95vw}dialog::backdrop
 .event-choice-actions{display:flex;gap:8px}
 .event-choice .preview-event{background:transparent;color:var(--orange-dark);border:1px solid var(--orange)}
 
-/* Wedding invitation: navy, deep red, and champagne. */
-.theme-wedding{--navy:#0b1f3a;--navy-2:#07162a;--ivory:#f7e7ce;--cream:#fffaf1;--orange:#8b1e2d;--orange-dark:#651522;--gold:#d6b77a;--ink:#14243a;--muted:#6c6570;--border:#ddccb1}
-.theme-wedding .site-header{background:linear-gradient(145deg,#fffaf1 0%,#f7e7ce 55%,#ead3ae 100%);border-bottom:5px solid var(--orange)}
+/* Wedding invitation: navy, deep red, and champagne, with a dress-inspired header. */
+.theme-wedding{--navy:#0b1f3a;--navy-2:#07162a;--ivory:#f7e7ce;--cream:#fffaf1;--orange:#8b1e2d;--orange-dark:#651522;--gold:#d6b77a;--ink:#14243a;--muted:#6c6570;--border:#ddccb1;--dress-taupe:#91887b;--dress-champagne:#c9beaa;--dress-bronze:#806746;--dress-espresso:#33271f}
+.theme-wedding .site-header{background-color:var(--dress-taupe);background-image:radial-gradient(ellipse at 18% 28%,rgba(51,39,31,.22) 0 2%,transparent 2.6%),radial-gradient(ellipse at 82% 68%,rgba(128,103,70,.28) 0 2.5%,transparent 3.2%),radial-gradient(circle at 68% 20%,rgba(241,226,196,.38) 0 1.2%,transparent 1.8%),linear-gradient(145deg,var(--dress-champagne) 0%,var(--dress-taupe) 54%,#756d62 100%);background-size:190px 150px,230px 180px,150px 120px,auto;border-bottom:5px solid var(--dress-espresso)}
+.theme-wedding .host-tools-button{background:rgba(201,190,170,.9);border-color:var(--dress-bronze);color:var(--dress-espresso)}
+.theme-wedding .host-tools-button:hover{background:var(--dress-champagne);border-color:var(--dress-espresso)}
+.theme-wedding .event-date{color:var(--dress-espresso);text-shadow:0 1px 0 rgba(255,255,255,.3)}
 .theme-wedding .section-kicker{color:var(--gold)}
 .theme-wedding .summary-strip strong{color:var(--gold)}
-.wedding-header{display:flex;flex-direction:column;gap:12px;align-items:center;color:var(--navy);text-transform:uppercase;letter-spacing:.22em}
+.wedding-header{display:flex;flex-direction:column;gap:12px;align-items:center;color:var(--dress-espresso);text-transform:uppercase;letter-spacing:.22em;text-shadow:0 1px 0 rgba(255,255,255,.28)}
 .wedding-header[hidden]{display:none}
-.wedding-header strong{font-family:"Times New Roman",Times,serif;color:var(--orange);font-size:clamp(3rem,9vw,6.5rem);font-weight:400;letter-spacing:.04em;text-transform:none;line-height:.9}
+.wedding-header strong{font-family:"Times New Roman",Times,serif;color:var(--dress-espresso);font-size:clamp(3rem,9vw,6.5rem);font-weight:400;letter-spacing:.04em;text-transform:none;line-height:.9}
 .wedding-header span{font-size:.72rem;font-weight:700}
 .wedding-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
 .registry-section{margin:0 auto 70px;padding:50px 30px;text-align:center;color:var(--ink);background:linear-gradient(135deg,#fffaf1,#f7e7ce);border:1px solid rgba(214,183,122,.65);border-radius:8px;box-shadow:0 12px 30px rgba(0,0,0,.16)}
