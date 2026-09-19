@@ -7,6 +7,7 @@ const HOST_PASSWORD = '0810'; // Change this before publishing your site.
 const HOST_DISPLAY_NAME = 'The Host';
 const DEFAULT_EVENT_DATE = '2026-11-28';
 const DEFAULT_CHRISTMAS_DATE = '2026-12-25';
+const DEFAULT_WEDDING_DATE = '2027-08-10';
 const CHRISTMAS_MENU_VERSION = 2;
 const ACCOUNT_RESET_VERSION = 1;
 const SIGNUP_RESET_VERSION = 1;
@@ -44,7 +45,8 @@ const GUEST_ACCOUNTS = [];
 
 const EVENT_DETAILS = {
   thanksgiving: { name: 'Thanksgiving', theme: 'thanksgiving', header: 'https://i.postimg.cc/JnFX8pPS/Website-Header-Thanksgiving.png' },
-  christmas: { name: 'Christmas', theme: 'christmas', header: 'https://i.postimg.cc/rmMy7x1t/Website-Header-Christmas.png' }
+  christmas: { name: 'Christmas', theme: 'christmas', header: 'https://i.postimg.cc/rmMy7x1t/Website-Header-Christmas.png' },
+  wedding: { name: 'Wedding', theme: 'wedding', header: '', registryOnly: true }
 };
 
 function christmasItems() {
@@ -78,13 +80,15 @@ function initialAppState() {
     accounts: structuredClone(GUEST_ACCOUNTS),
     events: {
       thanksgiving: makeEvent(structuredClone(defaultItems), DEFAULT_EVENT_DATE),
-      christmas: makeEvent(christmasItems(), DEFAULT_CHRISTMAS_DATE, CHRISTMAS_MENU_VERSION)
+      christmas: makeEvent(christmasItems(), DEFAULT_CHRISTMAS_DATE, CHRISTMAS_MENU_VERSION),
+      wedding: { ...makeEvent([], DEFAULT_WEDDING_DATE), registryUrl: '' }
     }
   };
 }
 
 let appState = loadState();
-let state = appState.events[appState.activeEventId];
+let viewedEventId = appState.activeEventId;
+let state = appState.events[viewedEventId];
 let guestName = '';
 let pendingAccountAction = null;
 let pendingClaimItemId = null;
@@ -167,7 +171,7 @@ function storeLocalState(nextState) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
 }
 function saveState() {
-  appState.events[appState.activeEventId] = state;
+  appState.events[viewedEventId] = state;
   storeLocalState(appState);
   localStateRevision += 1;
   render();
@@ -250,7 +254,8 @@ async function loadSharedState() {
     // when the window regains focus.
     if (!SHARED_STATE_URL && stateRecoveryScore(appState) > stateRecoveryScore(saved)) return;
     appState = saved;
-    state = appState.events[appState.activeEventId];
+    viewedEventId = hostAuthenticated && appState.events[viewedEventId] ? viewedEventId : appState.activeEventId;
+    state = appState.events[viewedEventId];
     storeLocalState(appState);
     render();
   } catch (error) {
@@ -369,19 +374,49 @@ function ensureAccount(callback) {
 }
 
 function render() {
-  const event = EVENT_DETAILS[appState.activeEventId];
+  const event = EVENT_DETAILS[viewedEventId];
+  const isWedding = event.registryOnly === true;
+  const isPreview = hostAuthenticated && viewedEventId !== appState.activeEventId;
   document.body.className = `theme-${event.theme}`;
   document.title = `The Meyers ${event.name}`;
   document.querySelector('meta[name="description"]').content = `The Meyers ${event.name} potluck and RSVP page.`;
   renderSyncStatus();
   const headerImage = document.querySelector('#eventHeaderImage');
-  headerImage.src = event.header;
+  headerImage.src = event.header || '';
   headerImage.alt = `${event.name} celebration header`;
-  headerImage.hidden = false;
+  headerImage.hidden = !event.header;
+  document.querySelector('#weddingHeader').hidden = !isWedding;
   const eventDate = new Date(`${state.eventDate}T12:00:00`);
   const dateElement = document.querySelector('#eventDate');
   dateElement.dateTime = state.eventDate;
   dateElement.textContent = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(eventDate).replaceAll(',', '');
+  document.querySelector('#welcome-title').textContent = isWedding ? "WE'D LOVE FOR YOU TO CELEBRATE WITH US" : "WE'D LOVE FOR YOU TO BRING A DISH TO SHARE";
+  document.querySelector('#welcomeNote').innerHTML = isWedding
+    ? '<em>Please let us know who will be joining us on our special day.</em>'
+    : '<em>Choose something delicious to bring. If bringing something isn\'t practical, simply come and enjoy the evening with us.</em>';
+  document.querySelector('#remainingSummary').hidden = isWedding;
+  document.querySelector('.summary-strip').classList.toggle('wedding-summary', isWedding);
+  document.querySelector('.menu-section').hidden = isWedding;
+  const registrySection = document.querySelector('#registrySection');
+  registrySection.hidden = !isWedding;
+  const registryButton = document.querySelector('#registryButton');
+  registryButton.href = state.registryUrl || '#';
+  registryButton.classList.toggle('disabled', !state.registryUrl);
+  registryButton.setAttribute('aria-disabled', String(!state.registryUrl));
+  registryButton.textContent = state.registryUrl ? 'View our registry' : (hostAuthenticated ? 'Add registry link in host tools' : 'Registry coming soon');
+  const editItemsButton = document.querySelector('#editItemsButton');
+  editItemsButton.querySelector('strong').textContent = isWedding ? 'Edit wedding details' : 'Edit menu items';
+  editItemsButton.querySelector('span').textContent = isWedding ? 'Update the date or registry link' : 'Add, change, or remove dishes';
+  document.querySelector('#clearClaimButton').hidden = isWedding;
+  let previewBanner = document.querySelector('#previewBanner');
+  if (!previewBanner) {
+    previewBanner = document.createElement('div');
+    previewBanner.id = 'previewBanner';
+    previewBanner.className = 'preview-banner';
+    document.body.prepend(previewBanner);
+  }
+  previewBanner.hidden = !isPreview;
+  previewBanner.textContent = isPreview ? `Host preview: ${event.name} is not visible to guests` : '';
   const categories = [...new Set(state.items.map(item => item.category))];
   const categoryCard = category => `
     <article class="category-card">
@@ -563,7 +598,13 @@ document.querySelector('#invitedListButton').addEventListener('click', () => {
   document.querySelector('#invitedListDialog').showModal();
 });
 function openAdmin() {
+  const isWedding = EVENT_DETAILS[viewedEventId].registryOnly === true;
   document.querySelector('#adminEventDate').value = state.eventDate;
+  document.querySelector('#adminHeading').textContent = isWedding ? 'Edit wedding details' : 'Edit the menu';
+  document.querySelector('#adminDescription').textContent = isWedding ? 'Change the wedding date or registry link while previewing the invitation.' : 'Change the event date, requested amounts, dish names, or add something new.';
+  document.querySelector('#adminRegistryField').hidden = !isWedding;
+  document.querySelector('#adminRegistryUrl').value = state.registryUrl || '';
+  document.querySelector('#menuAdminFields').hidden = isWedding;
   document.querySelector('#adminNewUnit').innerHTML = unitOptions();
   renderQuantityUnits();
   document.querySelector('#adminItems').innerHTML = state.items.map(item => `<div class="admin-row" data-admin-id="${escapeAttribute(item.id)}"><input value="${escapeAttribute(item.name)}" aria-label="Dish name"><select aria-label="Category">${['Appetizers','Main Table','Sides','Desserts','Drinks'].map(c => `<option ${c === item.category ? 'selected' : ''}>${c}</option>`).join('')}</select><select aria-label="Amount needed">${amountOptions(item)}</select><select aria-label="Quantity type">${unitOptions(item)}</select><button type="button" aria-label="Delete">×</button></div>`).join('');
@@ -664,12 +705,22 @@ function openEventsAdmin() {
     const active = id === appState.activeEventId;
     const date = new Date(`${appState.events[id].eventDate}T12:00:00`);
     const formatted = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(date).replaceAll(',', '');
-    return `<div class="event-choice"><div><strong>${event.name}</strong><span>${formatted}${active ? ' · Visible to guests' : ' · Hidden'}</span></div><button type="button" data-activate-event="${id}" ${active ? 'disabled' : ''}>${active ? 'Active' : 'Activate'}</button></div>`;
+    const previewing = id === viewedEventId;
+    return `<div class="event-choice"><div><strong>${event.name}</strong><span>${formatted}${active ? ' · Visible to guests' : ' · Hidden'}</span></div><div class="event-choice-actions"><button class="preview-event" type="button" data-preview-event="${id}" ${previewing ? 'disabled' : ''}>${previewing ? 'Previewing' : 'Preview'}</button><button type="button" data-activate-event="${id}" ${active ? 'disabled' : ''}>${active ? 'Active' : 'Activate'}</button></div></div>`;
   }).join('');
+  document.querySelectorAll('[data-preview-event]').forEach(button => button.addEventListener('click', () => {
+    viewedEventId = button.dataset.previewEvent;
+    state = appState.events[viewedEventId];
+    guestName = HOST_DISPLAY_NAME;
+    document.querySelector('#eventsDialog').close();
+    render();
+    showToast(`Previewing ${EVENT_DETAILS[viewedEventId].name}. Guests still see ${EVENT_DETAILS[appState.activeEventId].name}.`);
+  }));
   document.querySelectorAll('[data-activate-event]').forEach(button => button.addEventListener('click', () => {
-    appState.events[appState.activeEventId] = state;
+    appState.events[viewedEventId] = state;
     appState.activeEventId = button.dataset.activateEvent;
-    state = appState.events[appState.activeEventId];
+    viewedEventId = appState.activeEventId;
+    state = appState.events[viewedEventId];
     guestName = '';
     saveState();
     openEventsAdmin();
@@ -792,6 +843,12 @@ document.querySelector('#adminAddAccountButton').addEventListener('click', () =>
   appState.accounts.push({ name, selected: false, alwaysInvite: false }); input.value = ''; saveState(); openAccountsAdmin(); showToast(`${householdDisplayName(name)} account added. Enable it to allow sign-in.`);
 });
 document.querySelector('#adminEventDate').addEventListener('change', event => { if (!event.target.value) return; state.eventDate = event.target.value; state.accountSelectionResetFor = ''; saveState(); showToast('Event date updated.'); });
+document.querySelector('#adminRegistryUrl').addEventListener('change', event => {
+  if (EVENT_DETAILS[viewedEventId].registryOnly !== true) return;
+  state.registryUrl = event.target.value.trim();
+  saveState();
+  showToast('Registry link updated.');
+});
 document.querySelector('#adminAddUnitButton').addEventListener('click', () => {
   const input = document.querySelector('#adminNewUnitName');
   const label = input.value.trim();
