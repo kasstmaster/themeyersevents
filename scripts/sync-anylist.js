@@ -77,11 +77,11 @@ async function run() {
     const state = current.value;
     if (!Array.isArray(state.accounts)) throw new Error('Current state has no accounts array.');
     outcome = syncAnyListAccounts(state, accounts);
-    console.log(`${outcome.updated.length} account(s) updated; ${outcome.added.length} added.`);
+    console.log(`${outcome.updated.length} account(s) updated; ${outcome.added.length} added; ${outcome.skipped.length} ambiguous account(s) skipped.`);
     try { await putFile(statePath, state, `Sync ${accounts.length} account(s) from AnyList`, current.sha); console.log('Account state saved successfully.'); break; }
     catch (error) { if (!error.message.includes('(409)') || attempt === 2) throw error; console.log('State changed concurrently; retrying against the latest SHA.'); }
   }
-  await writeStatus({ state: 'complete', added: outcome.added.length, updated: outcome.updated.length, skipped, finishedAt: new Date().toISOString() });
+  await writeStatus({ state: 'complete', added: outcome.added.length, updated: outcome.updated.length, skipped: skipped + outcome.skipped.length, finishedAt: new Date().toISOString() });
 }
 
 run().catch(async error => {
