@@ -435,10 +435,13 @@ function openCustomItem(category) {
 
 document.querySelector('#passwordForm').addEventListener('submit', event => {
   event.preventDefault();
-  const accountName = document.querySelector('#accountPassword').value;
-  if (normalizeAccountName(accountName) === normalizeAccountName(HOST_PASSWORD)) {
+  const firstName = document.querySelector('#accountFirstName').value.trim();
+  const lastName = document.querySelector('#accountLastName').value.trim();
+  const suffix = document.querySelector('#accountSuffix').value.trim();
+  const accountName = [firstName, lastName, suffix].filter(Boolean).join(' ');
+  if (!lastName && !suffix && normalizeAccountName(firstName) === normalizeAccountName(HOST_PASSWORD)) {
     hostAuthenticated = true;
-    hostCredential = accountName;
+    hostCredential = firstName;
     guestName = HOST_DISPLAY_NAME;
     updateHostToolsButton();
     const action = pendingAccountAction;
@@ -453,8 +456,9 @@ document.querySelector('#passwordForm').addEventListener('submit', event => {
     else showToast('Host sign-in complete. You can RSVP and bring items as The Host.');
     return;
   }
+  if (!firstName || !lastName) { document.querySelector('#accountPasswordError').textContent = 'Enter your first and last name, plus your suffix if you have one.'; return; }
   const account = appState.accounts.find(entry => accountNameMatches(accountName, entry.name));
-  if (!account) { document.querySelector('#accountPasswordError').textContent = 'That first and last name is not recognized.'; return; }
+  if (!account) { document.querySelector('#accountPasswordError').textContent = 'That name and suffix are not recognized.'; return; }
   if (!account.selected) { document.querySelector('#accountPasswordError').textContent = 'This account is not currently invited.'; return; }
   guestName = account.name;
   document.querySelector('#accountPasswordError').textContent = '';
