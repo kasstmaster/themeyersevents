@@ -17,6 +17,7 @@
       <button class="host-tools-button" id="hostToolsButton" type="button" aria-haspopup="dialog">Settings</button>
       <div class="header-art">
         <img id="eventHeaderImage" alt="" hidden />
+        <div id="weddingHeader" class="wedding-header" hidden><span>Together with their families</span><strong>You're Invited</strong><span>to celebrate our wedding</span></div>
         <time id="eventDate" class="event-date"></time>
       </div>
     </header>
@@ -26,7 +27,7 @@
         <div>
           <p class="section-kicker">The Meyer's Table</p>
           <h2 id="welcome-title">WE'D LOVE FOR YOU TO BRING A DISH TO SHARE</h2>
-          <p class="welcome-note"><em>Choose something delicious to bring. If bringing something isn't practical, simply come and enjoy the evening with us.</em></p>
+          <p id="welcomeNote" class="welcome-note"><em>Choose something delicious to bring. If bringing something isn't practical, simply come and enjoy the evening with us.</em></p>
         </div>
         <button class="rsvp-button" id="rsvpButton" type="button">RSVP</button>
       </section>
@@ -34,7 +35,14 @@
       <section class="summary-strip" aria-label="Event summary">
         <button class="summary-item" id="guestListButton" type="button"><strong id="guestCount">0</strong><span>Guests attending</span></button>
         <button class="summary-item" id="invitedListButton" type="button"><strong id="invitedCount">0</strong><span>Families invited</span></button>
-        <div class="summary-stat"><strong id="remainingCount">0</strong><span>Dishes needed</span></div>
+        <div id="remainingSummary" class="summary-stat"><strong id="remainingCount">0</strong><span>Dishes needed</span></div>
+      </section>
+
+      <section id="registrySection" class="registry-section" aria-labelledby="registryHeading" hidden>
+        <p class="section-kicker">Your presence is the greatest gift</p>
+        <h2 id="registryHeading">Wedding Registry</h2>
+        <p>For those who have asked, you can find our registry below.</p>
+        <a id="registryButton" class="registry-button" target="_blank" rel="noopener noreferrer">View our registry</a>
       </section>
 
       <section class="menu-section" aria-label="Available dishes">
@@ -127,9 +135,11 @@
     <dialog id="adminDialog" class="wide-dialog">
       <form method="dialog" class="modal-card">
         <button class="modal-close" value="cancel" aria-label="Close">×</button>
-        <p class="section-kicker">Host dashboard</p><h2>Edit the menu</h2>
-        <p>Change the event date, requested amounts, dish names, or add something new.</p>
+        <p class="section-kicker">Host dashboard</p><h2 id="adminHeading">Edit the menu</h2>
+        <p id="adminDescription">Change the event date, requested amounts, dish names, or add something new.</p>
         <label class="admin-date"><span>Event date</span><input id="adminEventDate" type="date" required /></label>
+        <label id="adminRegistryField" class="admin-registry" hidden><span>Wedding registry link</span><input id="adminRegistryUrl" type="url" placeholder="https://www.example.com/our-registry" /></label>
+        <div id="menuAdminFields">
         <div id="adminItems" class="admin-items"></div>
         <div class="admin-add">
           <input id="adminNewItem" placeholder="New item" maxlength="60" />
@@ -148,6 +158,7 @@
           <div class="admin-unit-add"><input id="adminNewUnitName" maxlength="30" placeholder="New type, e.g. Package" /><button id="adminAddUnitButton" type="button">Add type</button></div>
           <p class="form-error" id="adminUnitError" role="alert"></p>
         </section>
+        </div>
         <button class="primary-button" value="default">Done editing</button>
       </form>
     </dialog>
@@ -184,7 +195,7 @@
       <form method="dialog" class="modal-card">
         <button class="modal-close" value="cancel" aria-label="Close">×</button>
         <p class="section-kicker">Host dashboard</p><h2>Manage events</h2>
-        <p>Only the active event is visible to guests. Accounts are shared across both events.</p>
+        <p>Only the active event is visible to guests. Preview any event privately before making it live.</p>
         <div id="eventChoices" class="event-choices"></div>
         <button class="primary-button" value="default">Done</button>
       </form>
