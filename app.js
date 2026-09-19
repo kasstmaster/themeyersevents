@@ -881,3 +881,12 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') loadSharedState();
 });
 if (SHARED_STATE_URL) setInterval(loadSharedState, 30000);
+
+// Let the wedding header's embroidered dots glint only while the page moves.
+const siteHeader = document.querySelector('.site-header');
+let scrollSparkleTimer;
+window.addEventListener('scroll', () => {
+  siteHeader.classList.add('is-scrolling');
+  clearTimeout(scrollSparkleTimer);
+  scrollSparkleTimer = setTimeout(() => siteHeader.classList.remove('is-scrolling'), 140);
+}, { passive: true });
