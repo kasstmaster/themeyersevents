@@ -58,7 +58,11 @@
         <button class="modal-close" value="cancel" aria-label="Close">×</button>
         <p class="section-kicker">Welcome to the Meyer's table</p>
         <h2>What's your name?</h2>
-        <label><input id="accountPassword" type="text" autocomplete="name" required placeholder="Enter your first and last name" /></label>
+        <div class="name-fields">
+          <label><span>First name</span><input id="accountFirstName" type="text" autocomplete="given-name" required /></label>
+          <label><span>Last name</span><input id="accountLastName" type="text" autocomplete="family-name" /></label>
+          <label><span>Suffix <small>(if any)</small></span><input id="accountSuffix" type="text" autocomplete="honorific-suffix" placeholder="e.g. Jr. or IV" /></label>
+        </div>
         <p class="form-error" id="accountPasswordError" role="alert"></p>
         <button class="primary-button" value="default">Let's get started</button>
       </form>

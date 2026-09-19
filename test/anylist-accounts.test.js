@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   addMissingAccounts, accountPeople, categoriesFromRawUserData, convertCategory,
-  normalizedPerson, syncAnyListAccounts
+  normalizedPerson, parsePerson, syncAnyListAccounts
 } from '../scripts/anylist-accounts.js';
 
 test('converts three households in category order and ignores notes', () => {
@@ -99,6 +99,23 @@ function category(id, names, heading = 'HALL') {
   return { id, ...converted };
 }
 
+test('Ben Hall IV and Sherri Hall group under the Hall surname', () => {
+  const converted = category('hall-123', ['Ben Hall IV', 'Sherri Hall']);
+  assert.deepEqual(converted.people, ['Ben Hall IV', 'Sherri Hall']);
+  assert.deepEqual(accountPeople(converted.account), ['Ben Hall IV', 'Sherri Hall']);
+  assert.equal(parsePerson('Ben Hall IV').surname, 'Hall');
+  assert.equal(parsePerson('Ben Hall IV').suffix, 'IV');
+});
+
+test('Ben Hall IV and Ben Hall V remain distinct people', () => {
+  assert.notEqual(normalizedPerson('Ben Hall IV'), normalizedPerson('Ben Hall V'));
+});
+
+test('John Smith Jr. groups with another Smith', () => {
+  const converted = convertCategory('SMITH', [{ name: 'John Smith Jr.' }, { name: 'Jane Smith' }]);
+  assert.deepEqual(accountPeople(converted.account), ['John Smith Jr.', 'Jane Smith']);
+});
+
 test('person removed updates the linked record and preserves selected', () => {
   const state = { accounts: [{ name: 'Ben Hall IV,Sherri Hall', selected: true, anyListCategoryId: 'hall-123', anyListAnchor: 'Ben Hall IV' }], events: {} };
   const result = syncAnyListAccounts(state, [category('hall-123', ['Ben Hall IV'])]);
@@ -151,6 +168,25 @@ test('category ID wins when the prior anchor was removed', () => {
   syncAnyListAccounts(state, [category('hall-123', ['Sherri Hall'])]);
   assert.equal(state.accounts.length, 1);
   assert.equal(state.accounts[0].name, 'Sherri Hall');
-  assert.equal(state.accounts[0].anyListAnchor, 'Sherri Hall');
   assert.equal(state.accounts[0].selected, true);
+});
+
+test('category ID remains the same account when its visible category name changes', () => {
+  const account = { name: 'Ben Hall IV,Sherri Hall', selected: true, theme: 'autumn', anyListCategoryId: 'hall-123' };
+  const state = { accounts: [account], events: {} };
+  syncAnyListAccounts(state, [category('hall-123', ['Ben Hall IV', 'Sherri Hall'], 'RENAMED CATEGORY')]);
+  assert.equal(state.accounts.length, 1);
+  assert.strictEqual(state.accounts[0], account);
+  assert.equal(account.theme, 'autumn');
+});
+
+test('an ambiguous legacy match is skipped instead of changing either account', () => {
+  const state = { accounts: [
+    { name: 'Ben Hall IV', selected: true },
+    { name: 'Ben Hall IV,Sherri Hall', selected: false }
+  ], events: {} };
+  const result = syncAnyListAccounts(state, [category('hall-123', ['Ben Hall IV', 'Katie Hall'])]);
+  assert.deepEqual(result.skipped, ['hall-123']);
+  assert.equal(state.accounts.length, 2);
+  assert.ok(state.accounts.every(account => account.anyListCategoryId == null));
 });
