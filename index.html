@@ -34,6 +34,8 @@
       <section class="summary-strip" aria-label="Event summary">
         <button class="summary-item" id="guestListButton" type="button"><strong id="guestCount">0</strong><span>Guests attending</span></button>
         <div class="divider"></div>
+        <button class="summary-item" id="invitedListButton" type="button"><strong id="invitedCount">0</strong><span>Families invited</span></button>
+        <div class="divider"></div>
         <div><strong id="dishCount">0</strong><span>Dishes claimed</span></div>
         <div class="divider"></div>
         <div><strong id="remainingCount">0</strong><span>Still needed</span></div>
@@ -89,6 +91,15 @@
         <button class="modal-close" value="cancel" aria-label="Close">×</button>
         <p class="section-kicker">Our family table</p><h2>Guests attending</h2>
         <div id="guestList" class="guest-list"></div>
+        <button class="primary-button" value="default">Close</button>
+      </form>
+    </dialog>
+
+    <dialog id="invitedListDialog">
+      <form method="dialog" class="modal-card">
+        <button class="modal-close" value="cancel" aria-label="Close">×</button>
+        <p class="section-kicker">Our family table</p><h2>Families invited</h2>
+        <div id="invitedList" class="guest-list"></div>
         <button class="primary-button" value="default">Close</button>
       </form>
     </dialog>
