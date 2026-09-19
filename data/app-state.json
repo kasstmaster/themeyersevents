@@ -175,6 +175,24 @@
           "claims": []
         }
       ]
+    },
+    "wedding": {
+      "eventDate": "2027-08-10",
+      "accountSelectionResetFor": "",
+      "quantityUnits": [
+        {
+          "id": "item",
+          "label": "Item",
+          "locked": true
+        },
+        {
+          "id": "dozen",
+          "label": "Dozen"
+        }
+      ],
+      "rsvps": [],
+      "items": [],
+      "registryUrl": ""
     }
   }
 }
