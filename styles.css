@@ -86,13 +86,10 @@ dialog{border:0;padding:0;background:transparent;max-width:95vw}dialog::backdrop
 .theme-wedding .host-tools-button{position:absolute;background:rgba(201,190,170,.9);border-color:var(--dress-bronze);color:var(--dress-espresso)}
 .theme-wedding .host-tools-button:hover{background:var(--dress-champagne);border-color:var(--dress-espresso)}
 .theme-wedding .event-date{color:var(--dress-espresso);text-shadow:0 1px 0 rgba(255,255,255,.3)}
+.theme-wedding .header-art img{width:min(85%,620px)}
 .theme-wedding .section-kicker{color:var(--gold)}
 .theme-wedding .summary-strip strong{color:var(--gold)}
 .theme-wedding #remainingSummary{display:none}
-.wedding-header{display:flex;flex-direction:column;gap:12px;align-items:center;color:var(--dress-espresso);text-transform:uppercase;letter-spacing:.22em;text-shadow:0 1px 0 rgba(255,255,255,.28)}
-.wedding-header[hidden]{display:none}
-.wedding-header strong{font-family:"Times New Roman",Times,serif;color:var(--dress-espresso);font-size:clamp(3rem,9vw,6.5rem);font-weight:400;letter-spacing:.04em;text-transform:none;line-height:.9}
-.wedding-header span{font-size:.72rem;font-weight:700}
 .wedding-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
 .registry-section{margin:0 auto 70px;padding:50px 30px;text-align:center;color:var(--ink);background:linear-gradient(135deg,#fffaf1,#f7e7ce);border:1px solid rgba(214,183,122,.65);border-radius:8px;box-shadow:0 12px 30px rgba(0,0,0,.16)}
 .registry-section[hidden]{display:none}
@@ -104,7 +101,7 @@ dialog{border:0;padding:0;background:transparent;max-width:95vw}dialog::backdrop
 .admin-registry input{width:100%}
 .preview-banner{position:relative;z-index:30;background:#f7e7ce;color:#651522;text-align:center;padding:10px 20px;font-size:.82rem;font-weight:700;letter-spacing:.04em;border-bottom:2px solid #8b1e2d}
 .preview-banner[hidden]{display:none}
-@media(max-width:520px){.event-choice{align-items:start}.event-choice-actions{flex-direction:column}.event-choice-actions button{width:92px}.wedding-header strong{font-size:3.2rem}}
+@media(max-width:520px){.event-choice{align-items:start}.event-choice-actions{flex-direction:column}.event-choice-actions button{width:92px}}
 
 /* Highlight claimed household names using each event theme accent. */
 .dish-claimants{color:var(--orange);font-weight:700}
