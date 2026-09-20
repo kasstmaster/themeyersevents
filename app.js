@@ -8,6 +8,7 @@ const HOST_DISPLAY_NAME = 'The Host';
 const DEFAULT_EVENT_DATE = '2026-11-28';
 const DEFAULT_CHRISTMAS_DATE = '2026-12-25';
 const DEFAULT_WEDDING_DATE = '2027-08-10';
+const DEFAULT_REGISTRY_URL = 'https://www.amazon.com/wedding/share/kassandraandsteven';
 const CHRISTMAS_MENU_VERSION = 2;
 const ACCOUNT_RESET_VERSION = 1;
 const SIGNUP_RESET_VERSION = 1;
@@ -83,7 +84,7 @@ function initialAppState() {
     events: {
       thanksgiving: makeEvent(structuredClone(defaultItems), DEFAULT_EVENT_DATE),
       christmas: makeEvent(christmasItems(), DEFAULT_CHRISTMAS_DATE, CHRISTMAS_MENU_VERSION),
-      wedding: { ...makeEvent([], DEFAULT_WEDDING_DATE), registryUrl: '' }
+      wedding: { ...makeEvent([], DEFAULT_WEDDING_DATE), registryUrl: DEFAULT_REGISTRY_URL }
     }
   };
 }
@@ -154,6 +155,7 @@ function normalizeState(saved) {
           : structuredClone(DEFAULT_QUANTITY_UNITS);
         if (!eventState.quantityUnits.length) eventState.quantityUnits = structuredClone(DEFAULT_QUANTITY_UNITS);
       });
+      loaded.events.wedding.registryUrl = loaded.events.wedding.registryUrl || DEFAULT_REGISTRY_URL;
       return loaded;
     }
     // Upgrade the original single-Thanksgiving data. Keep its sign-ups so an
@@ -512,6 +514,12 @@ function render() {
   registryButton.classList.toggle('disabled', !state.registryUrl);
   registryButton.setAttribute('aria-disabled', String(!state.registryUrl));
   registryButton.textContent = state.registryUrl ? 'View our registry' : (hostAuthenticated ? 'Add registry link in host tools' : 'Registry coming soon');
+  const registryWindow = document.querySelector('#registryWindow');
+  const registryFrame = document.querySelector('#registryFrame');
+  const registryFallbackLink = document.querySelector('#registryFallbackLink');
+  registryWindow.hidden = !isWedding || !state.registryUrl;
+  registryFallbackLink.href = state.registryUrl || '#';
+  if (state.registryUrl && registryFrame.src !== state.registryUrl) registryFrame.src = state.registryUrl;
   const editItemsButton = document.querySelector('#editItemsButton');
   editItemsButton.querySelector('strong').textContent = isWedding ? 'Edit wedding details' : 'Edit menu items';
   editItemsButton.querySelector('span').textContent = isWedding ? 'Update the date or registry link' : 'Add, change, or remove dishes';
