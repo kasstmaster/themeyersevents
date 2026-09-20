@@ -46,7 +46,7 @@ const GUEST_ACCOUNTS = [];
 const EVENT_DETAILS = {
   thanksgiving: { name: 'Thanksgiving', theme: 'thanksgiving', header: 'https://i.postimg.cc/JnFX8pPS/Website-Header-Thanksgiving.png' },
   christmas: { name: 'Christmas', theme: 'christmas', header: 'https://i.postimg.cc/rmMy7x1t/Website-Header-Christmas.png' },
-  wedding: { name: 'Wedding', theme: 'wedding', header: '', registryOnly: true }
+  wedding: { name: 'Wedding', theme: 'wedding', header: 'https://i.postimg.cc/d39xRWR6/Wedding-Header.png', registryOnly: true }
 };
 
 function christmasItems() {
@@ -385,14 +385,13 @@ function render() {
   headerImage.src = event.header || '';
   headerImage.alt = `${event.name} celebration header`;
   headerImage.hidden = !event.header;
-  document.querySelector('#weddingHeader').hidden = !isWedding;
   const eventDate = new Date(`${state.eventDate}T12:00:00`);
   const dateElement = document.querySelector('#eventDate');
   dateElement.dateTime = state.eventDate;
   dateElement.textContent = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(eventDate).replaceAll(',', '');
-  document.querySelector('#welcome-title').textContent = isWedding ? "WE'D LOVE FOR YOU TO CELEBRATE WITH US" : "WE'D LOVE FOR YOU TO BRING A DISH TO SHARE";
+  document.querySelector('#welcome-title').textContent = isWedding ? 'TOGETHER WITH THEIR PARENTS' : "WE'D LOVE FOR YOU TO BRING A DISH TO SHARE";
   document.querySelector('#welcomeNote').innerHTML = isWedding
-    ? '<em>Please let us know who will be joining us on our special day.</em>'
+    ? 'Kassandra Lynne Raudman and Steven Michael Meyer request the honor of your presence at their marriage'
     : '<em>Choose something delicious to bring. If bringing something isn\'t practical, simply come and enjoy the evening with us.</em>';
   document.querySelector('#remainingSummary').hidden = isWedding;
   document.querySelector('.summary-strip').classList.toggle('wedding-summary', isWedding);
