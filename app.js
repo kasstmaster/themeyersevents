@@ -882,11 +882,19 @@ document.addEventListener('visibilitychange', () => {
 });
 if (SHARED_STATE_URL) setInterval(loadSharedState, 30000);
 
-// Let the wedding header sparkle only while the page moves.
-const siteHeader = document.querySelector('.site-header');
-let scrollSparkleTimer;
-window.addEventListener('scroll', () => {
-  siteHeader.classList.add('is-scrolling');
-  clearTimeout(scrollSparkleTimer);
-  scrollSparkleTimer = setTimeout(() => siteHeader.classList.remove('is-scrolling'), 140);
-}, { passive: true });
+// Keep a field of independently moving sparkles alive across the wedding header.
+const sparkleField = document.querySelector('.wedding-sparkles');
+for (let index = 0; index < 40; index += 1) {
+  const sparkle = document.createElement('span');
+  const randomOffset = () => `${Math.round(Math.random() * 44 - 22)}px`;
+  sparkle.className = 'wedding-sparkle';
+  sparkle.style.setProperty('--sparkle-left', `${Math.random() * 100}%`);
+  sparkle.style.setProperty('--sparkle-top', `${Math.random() * 100}%`);
+  sparkle.style.setProperty('--sparkle-size', `${2 + Math.random() * 3}px`);
+  sparkle.style.setProperty('--sparkle-x', randomOffset());
+  sparkle.style.setProperty('--sparkle-y', randomOffset());
+  sparkle.style.setProperty('--sparkle-rotation', `${Math.round(Math.random() * 180 - 90)}deg`);
+  sparkle.style.setProperty('--sparkle-duration', `${1.4 + Math.random() * 2.8}s`);
+  sparkle.style.setProperty('--sparkle-delay', `${Math.random() * -4}s`);
+  sparkleField.append(sparkle);
+}
