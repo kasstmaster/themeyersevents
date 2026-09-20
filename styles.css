@@ -78,7 +78,7 @@ dialog{border:0;padding:0;background:transparent;max-width:95vw}dialog::backdrop
 .theme-wedding .site-header>*{position:relative;z-index:2}
 @keyframes wedding-sparkle{0%{opacity:.18;transform:scale(.82) rotate(-2deg)}55%{opacity:.95}100%{opacity:.35;transform:scale(1.08) rotate(2deg)}}
 @media(prefers-reduced-motion:reduce){.theme-wedding .site-header.is-scrolling::after{animation:none;opacity:.65;transform:none}}
-.theme-wedding .host-tools-button{background:rgba(201,190,170,.9);border-color:var(--dress-bronze);color:var(--dress-espresso)}
+.theme-wedding .host-tools-button{position:absolute;background:rgba(201,190,170,.9);border-color:var(--dress-bronze);color:var(--dress-espresso)}
 .theme-wedding .host-tools-button:hover{background:var(--dress-champagne);border-color:var(--dress-espresso)}
 .theme-wedding .event-date{color:var(--dress-espresso);text-shadow:0 1px 0 rgba(255,255,255,.3)}
 .theme-wedding .section-kicker{color:var(--gold)}
