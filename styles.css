@@ -85,8 +85,8 @@ dialog{border:0;padding:0;background:transparent;max-width:95vw}dialog::backdrop
 @media(prefers-reduced-motion:reduce){.wedding-sparkle{animation:none;opacity:.72}}
 .theme-wedding .host-tools-button{position:absolute;background:rgba(201,190,170,.9);border-color:var(--dress-bronze);color:var(--dress-espresso)}
 .theme-wedding .host-tools-button:hover{background:var(--dress-champagne);border-color:var(--dress-espresso)}
-.theme-wedding .event-date{order:-1;margin:0 0 24px;color:var(--dress-espresso);text-shadow:0 1px 0 rgba(255,255,255,.3)}
-.theme-wedding .header-art img{width:min(85%,620px)}
+.theme-wedding .event-date{order:-1;margin:0;color:var(--dress-espresso);text-shadow:0 1px 0 rgba(255,255,255,.3)}
+.theme-wedding .header-art img{width:100vw;max-width:none}
 .theme-wedding .section-kicker{color:var(--gold)}
 .theme-wedding .summary-strip strong{color:var(--gold)}
 .theme-wedding #remainingSummary{display:none}
