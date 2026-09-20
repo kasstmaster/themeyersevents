@@ -83,6 +83,7 @@ dialog{border:0;padding:0;background:transparent;max-width:95vw}dialog::backdrop
 .theme-wedding .event-date{color:var(--dress-espresso);text-shadow:0 1px 0 rgba(255,255,255,.3)}
 .theme-wedding .section-kicker{color:var(--gold)}
 .theme-wedding .summary-strip strong{color:var(--gold)}
+.theme-wedding #remainingSummary{display:none}
 .wedding-header{display:flex;flex-direction:column;gap:12px;align-items:center;color:var(--dress-espresso);text-transform:uppercase;letter-spacing:.22em;text-shadow:0 1px 0 rgba(255,255,255,.28)}
 .wedding-header[hidden]{display:none}
 .wedding-header strong{font-family:"Times New Roman",Times,serif;color:var(--dress-espresso);font-size:clamp(3rem,9vw,6.5rem);font-weight:400;letter-spacing:.04em;text-transform:none;line-height:.9}
