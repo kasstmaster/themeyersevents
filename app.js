@@ -11,6 +11,8 @@ const DEFAULT_WEDDING_DATE = '2027-08-10';
 const CHRISTMAS_MENU_VERSION = 2;
 const ACCOUNT_RESET_VERSION = 1;
 const SIGNUP_RESET_VERSION = 1;
+const NETWORK_TIMEOUT_MS = 10000;
+const SHARED_SAVE_RETRY_DELAYS = [1000, 3000, 10000, 30000];
 const DEFAULT_QUANTITY_UNITS = [
   { id: 'item', label: 'Item', locked: true },
   { id: 'dozen', label: 'Dozen' }
@@ -107,7 +109,7 @@ function normalizeState(saved) {
         ...fresh,
         ...saved,
         activeEventId: saved.events[saved.activeEventId] ? saved.activeEventId : 'thanksgiving',
-        accounts: (saved.accounts || fresh.accounts).map(account => ({
+        accounts: (Array.isArray(saved.accounts) ? saved.accounts : fresh.accounts).filter(account => account && typeof account.name === 'string').map(account => ({
           ...account,
           alwaysInvite: account.alwaysInvite === true,
           selected: account.alwaysInvite === true || account.selected !== false
@@ -124,8 +126,33 @@ function normalizeState(saved) {
       // cleared accounts, RSVPs, and claims when either marker was absent.
       loaded.accountResetVersion = ACCOUNT_RESET_VERSION;
       loaded.signupResetVersion = SIGNUP_RESET_VERSION;
-      Object.values(loaded.events).forEach(eventState => {
-        eventState.quantityUnits = eventState.quantityUnits?.length ? eventState.quantityUnits : structuredClone(DEFAULT_QUANTITY_UNITS);
+      Object.entries(loaded.events).forEach(([eventId, eventState]) => {
+        const fallback = fresh.events[eventId] || makeEvent([], DEFAULT_EVENT_DATE);
+        if (!eventState || typeof eventState !== 'object') {
+          loaded.events[eventId] = structuredClone(fallback);
+          return;
+        }
+        eventState.items = Array.isArray(eventState.items) ? eventState.items : structuredClone(fallback.items);
+        eventState.items = eventState.items.map((item, index) => ({
+          ...item,
+          id: String(item?.id || `recovered-${eventId}-${index}`),
+          name: String(item?.name || 'Untitled item'),
+          category: String(item?.category || 'Sides'),
+          needed: Number.isFinite(Number(item?.needed)) && Number(item.needed) > 0 ? Number(item.needed) : 1,
+          claims: Array.isArray(item?.claims) ? item.claims.filter(name => typeof name === 'string') : []
+        }));
+        eventState.rsvps = Array.isArray(eventState.rsvps) ? eventState.rsvps
+          .filter(rsvp => rsvp && typeof rsvp.name === 'string')
+          .map(rsvp => ({
+            ...rsvp,
+            adults: Math.max(0, Number(rsvp.adults) || 0),
+            children: Math.max(0, Number(rsvp.children) || 0)
+          })) : [];
+        eventState.eventDate = typeof eventState.eventDate === 'string' ? eventState.eventDate : fallback.eventDate;
+        eventState.quantityUnits = Array.isArray(eventState.quantityUnits) && eventState.quantityUnits.length
+          ? eventState.quantityUnits.filter(unit => unit && typeof unit.id === 'string' && typeof unit.label === 'string')
+          : structuredClone(DEFAULT_QUANTITY_UNITS);
+        if (!eventState.quantityUnits.length) eventState.quantityUnits = structuredClone(DEFAULT_QUANTITY_UNITS);
       });
       return loaded;
     }
@@ -166,22 +193,36 @@ function stateRecoveryScore(candidate) {
   return accounts * 10000 + rsvps * 100 + claims;
 }
 function storeLocalState(nextState) {
-  const current = localStorage.getItem(STORAGE_KEY);
-  if (current && current !== JSON.stringify(nextState)) localStorage.setItem(BACKUP_STORAGE_KEY, current);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
+  try {
+    const serialized = JSON.stringify(nextState);
+    const current = localStorage.getItem(STORAGE_KEY);
+    if (current && current !== serialized) localStorage.setItem(BACKUP_STORAGE_KEY, current);
+    localStorage.setItem(STORAGE_KEY, serialized);
+    return true;
+  } catch (error) {
+    console.error('Could not save a local state backup.', error);
+    return false;
+  }
 }
 function saveState() {
   appState.events[viewedEventId] = state;
-  storeLocalState(appState);
+  const storedLocally = storeLocalState(appState);
   localStateRevision += 1;
   render();
   queueSharedStateSave();
+  if (!storedLocally) showToast('This change could not be backed up on this device.');
 }
 
 let sharedSaveTimer;
 let sharedSavePending = false;
 let sharedSaveInProgress = false;
 let sharedSaveError = false;
+let sharedSaveRetryCount = 0;
+function fetchWithTimeout(url, options = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), NETWORK_TIMEOUT_MS);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
 function renderSyncStatus() {
   const status = document.querySelector('#syncStatus');
   if (!status) return;
@@ -199,6 +240,7 @@ function queueSharedStateSave() {
   if (!SHARED_STATE_URL) return;
   sharedSavePending = true;
   sharedSaveError = false;
+  sharedSaveRetryCount = 0;
   renderSyncStatus();
   clearTimeout(sharedSaveTimer);
   sharedSaveTimer = setTimeout(saveSharedState, 250);
@@ -209,13 +251,14 @@ async function saveSharedState() {
   sharedSaveInProgress = true;
   let saveFailed = false;
   try {
-    const response = await fetch(SHARED_STATE_URL, {
+    const response = await fetchWithTimeout(SHARED_STATE_URL, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(appState)
     });
     if (!response.ok) throw new Error(`Shared state save failed (${response.status})`);
     sharedSaveError = false;
+    sharedSaveRetryCount = 0;
   } catch (error) {
     console.error(error);
     saveFailed = true;
@@ -225,10 +268,14 @@ async function saveSharedState() {
   } finally {
     sharedSaveInProgress = false;
     renderSyncStatus();
-    // A change may have been made while the previous request was running.
-    if (sharedSavePending && !saveFailed) {
+    // A change may have been made while the request was running. Failed saves
+    // retry with a bounded backoff so a temporary outage cannot strand edits.
+    if (sharedSavePending) {
       clearTimeout(sharedSaveTimer);
-      sharedSaveTimer = setTimeout(saveSharedState, 250);
+      const delay = saveFailed
+        ? SHARED_SAVE_RETRY_DELAYS[Math.min(sharedSaveRetryCount++, SHARED_SAVE_RETRY_DELAYS.length - 1)]
+        : 250;
+      sharedSaveTimer = setTimeout(saveSharedState, delay);
     }
   }
 }
@@ -240,7 +287,7 @@ async function loadSharedState() {
   if (sharedSavePending || sharedSaveInProgress) return;
   const revisionBeforeLoad = localStateRevision;
   try {
-    const response = await fetch(stateUrl, { cache: 'no-store' });
+    const response = await fetchWithTimeout(stateUrl, { cache: 'no-store' });
     if (response.status === 404 || response.status === 204) {
       if (SHARED_STATE_URL) queueSharedStateSave();
       return;
@@ -401,6 +448,7 @@ function updateHeaderImage(event) {
   headerImage.removeAttribute('src');
   if (!nextSource) return;
   headerImage.addEventListener('load', () => { headerImage.hidden = false; }, { once: true });
+  headerImage.addEventListener('error', () => { headerImage.hidden = true; }, { once: true });
   headerImage.src = nextSource;
 }
 function updateHostToolsButton() { document.querySelector('#hostToolsButton').textContent = hostAuthenticated ? 'Host tools' : 'Settings'; }
@@ -499,8 +547,6 @@ function render() {
   invitedListButton.disabled = !hostAuthenticated;
   invitedListButton.title = hostAuthenticated ? 'View invited families' : 'Invited family details are private to the host';
   invitedListButton.setAttribute('aria-label', hostAuthenticated ? `${invitedAccounts.length} families invited; view private invitation list` : `${invitedAccounts.length} families invited; details visible only to the host`);
-  document.querySelectorAll('[data-claim]').forEach(button => button.addEventListener('click', () => claimItem(button.dataset.claim)));
-  document.querySelectorAll('[data-custom-category]').forEach(button => button.addEventListener('click', () => openCustomItem(button.dataset.customCategory)));
 }
 function renderDish(item) {
   const mine = guestName && item.claims.includes(guestName);
@@ -603,6 +649,15 @@ document.querySelector('#customItemForm').addEventListener('submit', event => {
   document.querySelector('#customItemDialog').close(); saveState(); showToast(`${name} was added to ${category}!`);
 });
 document.querySelector('#copyMenuButton').addEventListener('click', copyMenu);
+document.querySelector('#menuGrid').addEventListener('click', event => {
+  const claimButton = event.target.closest('[data-claim]');
+  if (claimButton) {
+    claimItem(claimButton.dataset.claim);
+    return;
+  }
+  const customButton = event.target.closest('[data-custom-category]');
+  if (customButton) openCustomItem(customButton.dataset.customCategory);
+});
 document.querySelector('#claimQuantityForm').addEventListener('submit', event => {
   event.preventDefault();
   if (event.submitter?.value === 'cancel') {
@@ -952,6 +1007,14 @@ render();
 startApp();
 singleColumnMenu.addEventListener('change', render);
 window.addEventListener('focus', loadSharedState);
+window.addEventListener('online', () => {
+  if (sharedSavePending && !sharedSaveInProgress) {
+    clearTimeout(sharedSaveTimer);
+    saveSharedState();
+  } else {
+    loadSharedState();
+  }
+});
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') loadSharedState();
 });
