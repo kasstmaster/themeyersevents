@@ -46,7 +46,7 @@ const GUEST_ACCOUNTS = [];
 const EVENT_DETAILS = {
   thanksgiving: { name: 'Thanksgiving', theme: 'thanksgiving', header: 'https://i.postimg.cc/JnFX8pPS/Website-Header-Thanksgiving.png' },
   christmas: { name: 'Christmas', theme: 'christmas', header: 'https://i.postimg.cc/rmMy7x1t/Website-Header-Christmas.png' },
-  wedding: { name: 'Wedding', theme: 'wedding', header: 'https://i.postimg.cc/Gp0x2FYx/Wedding-Header.png', registryOnly: true }
+  wedding: { name: 'Wedding', theme: 'wedding', header: 'https://i.postimg.cc/CxzTsgRn/Wedding-Header.png', registryOnly: true }
 };
 
 function christmasItems() {
