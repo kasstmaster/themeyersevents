@@ -8,6 +8,7 @@ const HOST_DISPLAY_NAME = 'The Host';
 const DEFAULT_EVENT_DATE = '2026-11-28';
 const DEFAULT_CHRISTMAS_DATE = '2026-12-25';
 const DEFAULT_WEDDING_DATE = '2027-08-10';
+const DEFAULT_REGISTRY_URL = 'https://www.amazon.com/wedding/share/kassandraandsteven';
 const CHRISTMAS_MENU_VERSION = 2;
 const ACCOUNT_RESET_VERSION = 1;
 const SIGNUP_RESET_VERSION = 1;
@@ -83,7 +84,7 @@ function initialAppState() {
     events: {
       thanksgiving: makeEvent(structuredClone(defaultItems), DEFAULT_EVENT_DATE),
       christmas: makeEvent(christmasItems(), DEFAULT_CHRISTMAS_DATE, CHRISTMAS_MENU_VERSION),
-      wedding: { ...makeEvent([], DEFAULT_WEDDING_DATE), registryUrl: '' }
+      wedding: { ...makeEvent([], DEFAULT_WEDDING_DATE), registryUrl: DEFAULT_REGISTRY_URL }
     }
   };
 }
@@ -154,6 +155,7 @@ function normalizeState(saved) {
           : structuredClone(DEFAULT_QUANTITY_UNITS);
         if (!eventState.quantityUnits.length) eventState.quantityUnits = structuredClone(DEFAULT_QUANTITY_UNITS);
       });
+      loaded.events.wedding.registryUrl = loaded.events.wedding.registryUrl || DEFAULT_REGISTRY_URL;
       return loaded;
     }
     // Upgrade the original single-Thanksgiving data. Keep its sign-ups so an
