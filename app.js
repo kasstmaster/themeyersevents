@@ -482,6 +482,11 @@ function render() {
   const event = EVENT_DETAILS[viewedEventId];
   const isWedding = event.registryOnly === true;
   const isPreview = hostAuthenticated && viewedEventId !== appState.activeEventId;
+  const signedInAccount = document.querySelector('#signedInAccount');
+  signedInAccount.hidden = !guestName;
+  document.querySelector('#signedInAccountName').textContent = guestName === HOST_DISPLAY_NAME
+    ? HOST_DISPLAY_NAME
+    : invitedAccountDisplayName(guestName);
   document.body.className = `theme-${event.theme}`;
   document.title = `The Meyers ${event.name}`;
   document.querySelector('meta[name="description"]').content = `The Meyers ${event.name} potluck and RSVP page.`;
