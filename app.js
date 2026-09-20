@@ -346,6 +346,48 @@ function accountNameMatches(enteredName, accountName) {
   return accountSignInNames(accountName).some(name => normalizeAccountName(name) === normalizedEntry);
 }
 function showToast(message) { const toast = document.querySelector('#toast'); toast.textContent = message; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2600); }
+function menuItemSummary(item) {
+  const claimCounts = item.claims.reduce((counts, name) => counts.set(name, (counts.get(name) || 0) + 1), new Map());
+  const bringing = [...claimCounts].map(([name, quantity]) => {
+    const amount = quantity > 1 ? ` ${formatQuantity(quantity, item)}` : '';
+    return `${contributionDisplayName(name)} is bringing${amount}`;
+  });
+  const remaining = Math.max(0, item.needed - item.claims.length);
+  const needed = item.optional
+    ? (item.claims.length ? '' : 'Optional')
+    : (remaining ? `${remaining} of ${formatQuantity(item.needed, item)} still needed` : '');
+  return [needed, ...bringing].filter(Boolean).join('; ');
+}
+function menuCopyText() {
+  const categories = [...new Set(state.items.map(item => item.category))];
+  return categories.map(category => {
+    const items = state.items
+      .filter(item => item.category === category)
+      .map(item => `${item.name} - ${menuItemSummary(item)}`);
+    return [`${category.toLocaleUpperCase()}:`, ...items].join('\n');
+  }).join('\n\n');
+}
+async function copyMenu() {
+  const text = menuCopyText();
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.setAttribute('readonly', '');
+    textArea.style.position = 'fixed';
+    textArea.style.opacity = '0';
+    document.body.append(textArea);
+    textArea.select();
+    const copied = document.execCommand('copy');
+    textArea.remove();
+    if (!copied) {
+      showToast('The menu could not be copied. Please try again.');
+      return;
+    }
+  }
+  showToast('Menu copied! It is ready to paste into a message.');
+}
 function updateHeaderImage(event) {
   const headerImage = document.querySelector('#eventHeaderImage');
   const nextSource = event.header || '';
@@ -409,6 +451,7 @@ function render() {
   document.querySelector('#remainingSummary').hidden = isWedding;
   document.querySelector('.summary-strip').classList.toggle('wedding-summary', isWedding);
   document.querySelector('.menu-section').hidden = isWedding;
+  document.querySelector('#copyMenuButton').hidden = state.items.length === 0;
   const registrySection = document.querySelector('#registrySection');
   registrySection.hidden = !isWedding;
   const registryButton = document.querySelector('#registryButton');
@@ -559,6 +602,7 @@ document.querySelector('#customItemForm').addEventListener('submit', event => {
   event.target.reset(); document.querySelector('#customItemQuantity').value = 1;
   document.querySelector('#customItemDialog').close(); saveState(); showToast(`${name} was added to ${category}!`);
 });
+document.querySelector('#copyMenuButton').addEventListener('click', copyMenu);
 document.querySelector('#claimQuantityForm').addEventListener('submit', event => {
   event.preventDefault();
   if (event.submitter?.value === 'cancel') {
