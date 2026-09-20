@@ -657,19 +657,38 @@ function openAdmin() {
   const isWedding = EVENT_DETAILS[viewedEventId].registryOnly === true;
   document.querySelector('#adminEventDate').value = state.eventDate;
   document.querySelector('#adminHeading').textContent = isWedding ? 'Edit wedding details' : 'Edit the menu';
-  document.querySelector('#adminDescription').textContent = isWedding ? 'Change the wedding date or registry link while previewing the invitation.' : 'Change the event date, requested amounts, dish names, or add something new.';
+  document.querySelector('#adminDescription').textContent = isWedding ? 'Change the wedding date or registry link while previewing the invitation.' : 'Change the event date, sort the dishes, update requested amounts, or add something new.';
   document.querySelector('#adminRegistryField').hidden = !isWedding;
   document.querySelector('#adminRegistryUrl').value = state.registryUrl || '';
   document.querySelector('#menuAdminFields').hidden = isWedding;
   document.querySelector('#adminNewUnit').innerHTML = unitOptions();
   renderQuantityUnits();
-  document.querySelector('#adminItems').innerHTML = state.items.map(item => `<div class="admin-row" data-admin-id="${escapeAttribute(item.id)}"><input value="${escapeAttribute(item.name)}" aria-label="Dish name"><select aria-label="Category">${['Appetizers','Main Table','Sides','Desserts','Drinks'].map(c => `<option ${c === item.category ? 'selected' : ''}>${c}</option>`).join('')}</select><select aria-label="Amount needed">${amountOptions(item)}</select><select aria-label="Quantity type">${unitOptions(item)}</select><button type="button" aria-label="Delete">×</button></div>`).join('');
+  document.querySelector('#adminItems').innerHTML = state.items.map((item, index) => {
+    const previousInCategory = state.items.slice(0, index).some(entry => entry.category === item.category);
+    const nextInCategory = state.items.slice(index + 1).some(entry => entry.category === item.category);
+    return `<div class="admin-row" data-admin-id="${escapeAttribute(item.id)}"><input value="${escapeAttribute(item.name)}" aria-label="Dish name"><select aria-label="Category">${['Appetizers','Main Table','Sides','Desserts','Drinks'].map(c => `<option ${c === item.category ? 'selected' : ''}>${c}</option>`).join('')}</select><select aria-label="Amount needed">${amountOptions(item)}</select><select aria-label="Quantity type">${unitOptions(item)}</select><div class="admin-row-actions"><button type="button" data-move="up" aria-label="Move ${escapeAttribute(item.name)} up" title="Move up" ${previousInCategory ? '' : 'disabled'}>↑</button><button type="button" data-move="down" aria-label="Move ${escapeAttribute(item.name)} down" title="Move down" ${nextInCategory ? '' : 'disabled'}>↓</button><button type="button" class="admin-delete" aria-label="Delete ${escapeAttribute(item.name)}" title="Delete">×</button></div></div>`;
+  }).join('');
   document.querySelectorAll('.admin-row').forEach(row => {
-    const [name, category, amount, unit, remove] = row.children;
+    const [name, category, amount, unit, actions] = row.children;
     [name, category, amount, unit].forEach(input => input.addEventListener('change', () => { const item = state.items.find(i => i.id === row.dataset.adminId); item.name = name.value.trim() || item.name; item.category = category.value; item.optional = amount.value === 'optional'; item.unit = unit.value; if (!item.optional) item.needed = Number(amount.value); saveState(); }));
+    actions.querySelectorAll('[data-move]').forEach(button => button.addEventListener('click', () => moveAdminItem(row.dataset.adminId, button.dataset.move)));
+    const remove = actions.querySelector('.admin-delete');
     remove.addEventListener('click', () => { state.items = state.items.filter(i => i.id !== row.dataset.adminId); saveState(); openAdmin(); });
   });
   const dialog = document.querySelector('#adminDialog'); if (!dialog.open) dialog.showModal();
+}
+function moveAdminItem(itemId, direction) {
+  const itemIndex = state.items.findIndex(item => item.id === itemId);
+  if (itemIndex < 0) return;
+  const item = state.items[itemIndex];
+  const step = direction === 'up' ? -1 : 1;
+  let swapIndex = itemIndex + step;
+  while (state.items[swapIndex] && state.items[swapIndex].category !== item.category) swapIndex += step;
+  if (!state.items[swapIndex]) return;
+  [state.items[itemIndex], state.items[swapIndex]] = [state.items[swapIndex], state.items[itemIndex]];
+  saveState();
+  openAdmin();
+  document.querySelector(`[data-admin-id="${CSS.escape(itemId)}"] [data-move="${direction}"]`)?.focus();
 }
 function renderQuantityUnits() {
   document.querySelector('#adminUnitError').textContent = '';
