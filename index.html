@@ -10,6 +10,7 @@
     <!-- This checked-in file is the cross-device fallback when no worker is configured. -->
     <meta name="repository-state-url" content="data/app-state.json" />
     <title>The Meyers Family Events</title>
+    <link rel="preconnect" href="https://i.postimg.cc" crossorigin />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -17,7 +18,7 @@
       <div class="wedding-sparkles" aria-hidden="true"></div>
       <button class="host-tools-button" id="hostToolsButton" type="button" aria-haspopup="dialog">Settings</button>
       <div class="header-art">
-        <img id="eventHeaderImage" alt="" hidden />
+        <img id="eventHeaderImage" alt="" decoding="async" fetchpriority="high" hidden />
         <time id="eventDate" class="event-date"></time>
       </div>
     </header>
@@ -224,6 +225,6 @@
     </dialog>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script src="app.js"></script>
+    <script src="app.js" defer></script>
   </body>
 </html>
