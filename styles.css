@@ -78,8 +78,8 @@ dialog{border:0;padding:0;background:transparent;max-width:95vw}dialog::backdrop
 .theme-wedding .site-header{overflow:hidden;background:#f4e8d5;border-bottom:5px solid var(--dress-espresso);padding-bottom:0}
 .wedding-sparkles{display:none}
 .theme-wedding .wedding-sparkles{display:block;position:absolute;z-index:1;inset:0;overflow:hidden;pointer-events:none}
-.wedding-sparkle{position:absolute;left:var(--sparkle-left);top:var(--sparkle-top);width:var(--sparkle-size);height:var(--sparkle-size);border-radius:50%;background:#fff8e1;box-shadow:0 0 8px 2px rgba(255,238,196,.65);animation:wedding-sparkle var(--sparkle-duration) ease-in-out var(--sparkle-delay) infinite alternate}
-.wedding-sparkle::before,.wedding-sparkle::after{content:"";position:absolute;left:50%;top:50%;background:#fff8e1;border-radius:100%;transform:translate(-50%,-50%)}
+.wedding-sparkle{position:absolute;left:var(--sparkle-left);top:var(--sparkle-top);width:var(--sparkle-size);height:var(--sparkle-size);border-radius:50%;background:#fff;box-shadow:0 0 8px 2px rgba(255,255,255,.65);animation:wedding-sparkle var(--sparkle-duration) ease-in-out var(--sparkle-delay) infinite alternate}
+.wedding-sparkle::before,.wedding-sparkle::after{content:"";position:absolute;left:50%;top:50%;background:#fff;border-radius:100%;transform:translate(-50%,-50%)}
 .wedding-sparkle::before{width:1px;height:calc(var(--sparkle-size) * 4)}
 .wedding-sparkle::after{width:calc(var(--sparkle-size) * 4);height:1px}
 .theme-wedding .site-header>*{position:relative;z-index:2}
