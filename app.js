@@ -346,6 +346,21 @@ function accountNameMatches(enteredName, accountName) {
   return accountSignInNames(accountName).some(name => normalizeAccountName(name) === normalizedEntry);
 }
 function showToast(message) { const toast = document.querySelector('#toast'); toast.textContent = message; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2600); }
+function updateHeaderImage(event) {
+  const headerImage = document.querySelector('#eventHeaderImage');
+  const nextSource = event.header || '';
+  headerImage.alt = `${event.name} celebration header`;
+  if (headerImage.getAttribute('src') === nextSource) return;
+
+  // Hide the previous event's decoded image while the next one downloads.
+  // Browsers otherwise keep painting the old bitmap after `src` changes,
+  // which briefly showed the Thanksgiving artwork on the Wedding event.
+  headerImage.hidden = true;
+  headerImage.removeAttribute('src');
+  if (!nextSource) return;
+  headerImage.addEventListener('load', () => { headerImage.hidden = false; }, { once: true });
+  headerImage.src = nextSource;
+}
 function updateHostToolsButton() { document.querySelector('#hostToolsButton').textContent = hostAuthenticated ? 'Host tools' : 'Settings'; }
 function setHostPasswordMode(enabled) {
   const guestFields = document.querySelector('#guestSignInFields');
@@ -381,10 +396,7 @@ function render() {
   document.title = `The Meyers ${event.name}`;
   document.querySelector('meta[name="description"]').content = `The Meyers ${event.name} potluck and RSVP page.`;
   renderSyncStatus();
-  const headerImage = document.querySelector('#eventHeaderImage');
-  headerImage.src = event.header || '';
-  headerImage.alt = `${event.name} celebration header`;
-  headerImage.hidden = !event.header;
+  updateHeaderImage(event);
   const eventDate = new Date(`${state.eventDate}T12:00:00`);
   const dateElement = document.querySelector('#eventDate');
   dateElement.dateTime = state.eventDate;
