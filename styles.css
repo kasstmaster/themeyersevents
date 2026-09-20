@@ -75,7 +75,7 @@ dialog{border:0;padding:0;background:transparent;max-width:95vw}dialog::backdrop
 
 /* Wedding invitation: navy, deep red, and champagne, with a dress-inspired header. */
 .theme-wedding{--navy:#0b1f3a;--navy-2:#07162a;--ivory:#f7e7ce;--cream:#fffaf1;--orange:#8b1e2d;--orange-dark:#651522;--gold:#d6b77a;--ink:#14243a;--muted:#6c6570;--border:#ddccb1;--dress-taupe:#91887b;--dress-champagne:#c9beaa;--dress-bronze:#806746;--dress-espresso:#33271f}
-.theme-wedding .site-header{overflow:hidden;background-color:var(--dress-taupe);background-image:linear-gradient(145deg,var(--dress-champagne) 0%,var(--dress-taupe) 54%,#756d62 100%);border-bottom:5px solid var(--dress-espresso);padding-bottom:0}
+.theme-wedding .site-header{overflow:hidden;background:#f4e8d5;border-bottom:5px solid var(--dress-espresso);padding-bottom:0}
 .wedding-sparkles{display:none}
 .theme-wedding .wedding-sparkles{display:block;position:absolute;z-index:1;inset:0;overflow:hidden;pointer-events:none}
 .wedding-sparkle{position:absolute;left:var(--sparkle-left);top:var(--sparkle-top);width:var(--sparkle-size);height:var(--sparkle-size);border-radius:50%;background:#fff8e1;box-shadow:0 0 8px 2px rgba(255,238,196,.65);animation:wedding-sparkle var(--sparkle-duration) ease-in-out var(--sparkle-delay) infinite alternate}
@@ -92,6 +92,7 @@ dialog{border:0;padding:0;background:transparent;max-width:95vw}dialog::backdrop
 .theme-wedding .header-art{max-width:1050px}
 .theme-wedding .header-art img{width:1050px;max-width:100%}
 .theme-wedding .section-kicker{color:var(--gold)}
+.theme-wedding .registry-section .section-kicker{color:var(--navy)}
 .theme-wedding .summary-strip strong{color:var(--gold)}
 .theme-wedding #remainingSummary{display:none}
 .wedding-summary{grid-template-columns:repeat(2,minmax(0,1fr))}

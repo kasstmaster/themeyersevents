@@ -389,6 +389,7 @@ function render() {
   const dateElement = document.querySelector('#eventDate');
   dateElement.dateTime = state.eventDate;
   dateElement.textContent = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(eventDate).replaceAll(',', '');
+  document.querySelector('#welcomeKicker').hidden = isWedding;
   document.querySelector('#welcome-title').textContent = isWedding ? 'TOGETHER WITH THEIR PARENTS' : "WE'D LOVE FOR YOU TO BRING A DISH TO SHARE";
   document.querySelector('#welcomeNote').innerHTML = isWedding
     ? 'Kassandra Lynne Raudman and Steven Michael Meyer request the honor of your presence at their marriage'
