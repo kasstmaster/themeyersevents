@@ -514,12 +514,6 @@ function render() {
   registryButton.classList.toggle('disabled', !state.registryUrl);
   registryButton.setAttribute('aria-disabled', String(!state.registryUrl));
   registryButton.textContent = state.registryUrl ? 'View our registry' : (hostAuthenticated ? 'Add registry link in host tools' : 'Registry coming soon');
-  const registryWindow = document.querySelector('#registryWindow');
-  const registryFrame = document.querySelector('#registryFrame');
-  const registryFallbackLink = document.querySelector('#registryFallbackLink');
-  registryWindow.hidden = !isWedding || !state.registryUrl;
-  registryFallbackLink.href = state.registryUrl || '#';
-  if (state.registryUrl && registryFrame.src !== state.registryUrl) registryFrame.src = state.registryUrl;
   const editItemsButton = document.querySelector('#editItemsButton');
   editItemsButton.querySelector('strong').textContent = isWedding ? 'Edit wedding details' : 'Edit menu items';
   editItemsButton.querySelector('span').textContent = isWedding ? 'Update the date or registry link' : 'Add, change, or remove dishes';
