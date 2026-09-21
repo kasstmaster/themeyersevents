@@ -150,10 +150,12 @@ dialog{border:0;padding:0;background:transparent;max-width:95vw}dialog::backdrop
 .sign-in-card .name-fields small{color:#c1cad5}
 .sign-in-card .form-error{color:#ffb8c2}
 .sign-in-card input{box-sizing:border-box;width:100%;border:1px solid #ddccb1;border-radius:4px;background:#fff;padding:14px;color:#14243a;font-size:1.05rem}
-.attire-page{background:#fffaf1;color:#14243a;padding-bottom:70px}
+.attire-page{background:#0b1f3a;color:#fff;padding-bottom:70px}
 .attire-header{padding:42px 24px 28px;text-align:center;background:#f1e7d7;border-bottom:5px solid #8b1e2d}
 .attire-main{max-width:960px;margin:0 auto;padding:64px 28px 0;text-align:center}
 .attire-lead{font-family:"Times New Roman",Times,serif;font-size:1.3rem;color:#6c6570}
+.attire-page .attire-main h1,.attire-page .attire-videos h2{color:#fffaf1}
+.attire-page .attire-lead{color:#c1cad5}
 .attire-guidance{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;margin:42px 0}
 .attire-guidance article{padding:34px;background:#fff;border:1px solid #ddccb1;border-top:5px solid #8b1e2d;border-radius:7px;box-shadow:0 12px 28px rgba(11,31,58,.1)}
 .attire-guidance h2,.attire-videos h2{font-family:"Times New Roman",Times,serif;color:#0b1f3a;font-size:1.75rem}.attire-guidance p{color:#6c6570;line-height:1.7}
