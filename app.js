@@ -555,7 +555,7 @@ function render() {
   document.querySelector('#welcomeKicker').hidden = isWedding;
   document.querySelector('#welcome-title').textContent = isWedding ? 'TOGETHER WITH THEIR PARENTS' : "WE'D LOVE FOR YOU TO BRING A DISH TO SHARE";
   document.querySelector('#welcomeNote').innerHTML = isWedding
-    ? 'Kassandra Lynne Raudman and Steven Michael Meyer request the honor of your presence at their marriage'
+    ? '<em>Kassandra Lynne Raudman and Steven Michael Meyer request the honor of your presence at their marriage</em>'
     : '<em>Choose something delicious to bring. If bringing something isn\'t practical, simply come and enjoy the evening with us.</em>';
   document.querySelector('#remainingSummary').hidden = isWedding;
   document.querySelector('.summary-strip').classList.toggle('wedding-summary', isWedding);
