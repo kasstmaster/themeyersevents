@@ -376,15 +376,15 @@ function removeItemClaims(item, claimant, quantity) {
 }
 function accountSignInNames(accountName) {
   return accountName.split('/').flatMap(household => {
-    const entry = household.trim();
-    const explicitNames = entry.split(',').map(name => name.trim()).filter(Boolean);
-    if (explicitNames.length > 1 && explicitNames.every(name => name.split(/\s+/).length >= 2)) return explicitNames;
-    const lastSpace = entry.lastIndexOf(' ');
-    if (lastSpace < 0) return [entry];
-    const lastName = entry.slice(lastSpace + 1).trim();
-    return entry.slice(0, lastSpace).split(',')
-      .map(firstName => `${firstName.trim()} ${lastName}`)
-      .filter(name => name.length > lastName.length + 1);
+    const names = household.split(',').map(name => name.trim()).filter(Boolean);
+    return names.map((name, index) => {
+      if (name.split(/\s+/).length >= 2) return name;
+      const nextFullName = names.slice(index + 1).find(candidate => candidate.split(/\s+/).length >= 2);
+      if (!nextFullName) return '';
+      const words = nextFullName.split(/\s+/);
+      if (words.length > 2 && /^(?:jr\.?|sr\.?|i|ii|iii|iv|v|vi|vii|viii|ix|x)$/i.test(words.at(-1))) words.pop();
+      return `${name} ${words.at(-1)}`;
+    }).filter(Boolean);
   });
 }
 function firstAccountLastName(accountName) {

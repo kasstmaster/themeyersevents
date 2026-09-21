@@ -130,13 +130,14 @@ export function accountPeople(accountName) {
   return clean(accountName).split('/').flatMap(part => {
     const entries = clean(part).split(',').map(clean).filter(Boolean);
     if (!entries.length) return [];
-    const parsed = entries.map(parsePerson);
-    if (parsed.every(Boolean)) return entries;
-    const final = parsePerson(entries.at(-1));
-    if (!final) return [];
-    return entries.map((entry, index) => index === entries.length - 1
-      ? entry
-      : `${entry} ${final.surname}`);
+    // A household may mix compact names and full names, such as
+    // "Leonna,Brady Baker,Robert Pulido". A bare given name inherits the
+    // surname of the next full name; already-complete names remain unchanged.
+    return entries.map((entry, index) => {
+      if (parsePerson(entry)) return entry;
+      const nextPerson = entries.slice(index + 1).map(parsePerson).find(Boolean);
+      return nextPerson ? `${entry} ${nextPerson.surname}` : '';
+    }).filter(Boolean);
   });
 }
 
