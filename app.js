@@ -1120,7 +1120,7 @@ document.querySelector('#acknowledgeAttireButton').addEventListener('click', () 
 
 document.querySelectorAll('.affordable-attire-toggle').forEach(button => {
   button.addEventListener('click', () => {
-    const details = button.nextElementSibling;
+    const details = document.querySelector(`#${button.getAttribute('aria-controls')}`);
     const isOpening = details.hidden;
     details.hidden = !isOpening;
     button.setAttribute('aria-expanded', String(isOpening));
