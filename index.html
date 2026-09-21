@@ -14,6 +14,54 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <section id="signInPage" class="sign-in-page theme-wedding" aria-labelledby="signInHeading">
+      <header class="site-header sign-in-header">
+        <button class="host-tools-button sign-in-settings" id="signInSettingsButton" type="button">Settings</button>
+        <div class="header-art">
+          <img src="https://i.ibb.co/KjtXKDRn/Wedding-Header-Website-No-Border.png" alt="Kassandra and Steven wedding" decoding="async" fetchpriority="high" />
+          <time id="signInEventDate" class="event-date"></time>
+        </div>
+      </header>
+      <div class="sign-in-panel">
+        <form id="passwordForm" class="sign-in-card">
+          <p class="section-kicker">Welcome</p>
+          <h1 id="signInHeading">What's your name?</h1>
+          <p class="sign-in-intro">Sign in to view the current Meyers family event.</p>
+          <div class="name-fields" id="guestSignInFields">
+            <label><span>First name</span><input id="accountFirstName" type="text" autocomplete="given-name" required /></label>
+            <label><span>Last name</span><input id="accountLastName" type="text" autocomplete="family-name" /></label>
+            <label><span>Suffix <small>(if any)</small></span><input id="accountSuffix" type="text" autocomplete="honorific-suffix" placeholder="e.g. Jr. or IV" /></label>
+          </div>
+          <div id="hostSignInFields" hidden>
+            <label><span>Host password</span><input id="hostPassword" type="password" autocomplete="current-password" disabled /></label>
+          </div>
+          <p class="form-error" id="accountPasswordError" role="alert"></p>
+          <button class="primary-button" id="signInSubmit" type="submit">Let's get started</button>
+          <button class="alternate-sign-in" id="hostPasswordToggle" type="button">OR ENTER PASSWORD</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="attirePage" class="attire-page" aria-labelledby="attireHeading" hidden>
+      <div class="attire-header">
+        <img src="https://i.ibb.co/KjtXKDRn/Wedding-Header-Website-No-Border.png" alt="Kassandra and Steven wedding" decoding="async" />
+      </div>
+      <main class="attire-main">
+        <p class="section-kicker">Before you RSVP</p>
+        <h1 id="attireHeading" tabindex="-1">Wedding Attire</h1>
+        <p class="attire-lead">We kindly request formal attire for our celebration.</p>
+        <div class="attire-guidance">
+          <article><span aria-hidden="true">◆</span><h2>For Women</h2><p>Please choose an elevated formal look in a solid color or subtle pattern. We ask that you avoid loud, overly ornate, or busy patterns.</p></article>
+          <article><span aria-hidden="true">◆</span><h2>For Men</h2><p>A black suit, dress shirt, and formal shoes are requested.</p></article>
+        </div>
+        <section id="attireVideosSection" class="attire-videos" aria-labelledby="attireVideosHeading" hidden>
+          <p class="section-kicker">A little inspiration</p><h2 id="attireVideosHeading">Formal Attire Tips</h2><div id="attireVideos" class="attire-video-grid"></div>
+        </section>
+        <button id="acknowledgeAttireButton" class="attire-continue" type="button">I understand — continue to RSVP</button>
+      </main>
+    </section>
+
+    <div id="eventPage" hidden>
     <header class="site-header">
       <div class="wedding-sparkles" aria-hidden="true"></div>
       <button class="host-tools-button" id="hostToolsButton" type="button" aria-haspopup="dialog">Settings</button>
@@ -62,6 +110,19 @@
         </div>
       </section>
 
+      <section id="registryAttireSection" class="registry-attire-section" aria-labelledby="registryAttireHeading" hidden>
+        <p class="section-kicker">Dress for the occasion</p>
+        <h2 id="registryAttireHeading">Wedding Attire</h2>
+        <p class="attire-lead">We kindly request formal attire for our celebration.</p>
+        <div class="attire-guidance">
+          <article><span aria-hidden="true">◆</span><h3>For Women</h3><p>Please choose an elevated formal look in a solid color or subtle pattern. We ask that you avoid loud, overly ornate, or busy patterns.</p></article>
+          <article><span aria-hidden="true">◆</span><h3>For Men</h3><p>A black suit, dress shirt, and formal shoes are requested.</p></article>
+        </div>
+        <section id="registryAttireVideosSection" class="attire-videos" aria-labelledby="registryAttireVideosHeading" hidden>
+          <p class="section-kicker">A little inspiration</p><h3 id="registryAttireVideosHeading">Formal Attire Tips</h3><div id="registryAttireVideos" class="attire-video-grid"></div>
+        </section>
+      </section>
+
       <section class="menu-section" aria-label="Available dishes">
         <div class="menu-heading">
           <button class="copy-menu-button" id="copyMenuButton" type="button">Copy menu</button>
@@ -78,25 +139,6 @@
         Bakersfield CA 93225
       </address>
     </footer>
-
-    <dialog id="passwordDialog">
-      <form method="dialog" id="passwordForm" class="modal-card">
-        <button class="modal-close" value="cancel" aria-label="Close">×</button>
-        <p class="section-kicker">Welcome to the Meyer's table</p>
-        <h2 id="signInHeading">What's your name?</h2>
-        <div class="name-fields" id="guestSignInFields">
-          <label><span>First name</span><input id="accountFirstName" type="text" autocomplete="given-name" required /></label>
-          <label><span>Last name</span><input id="accountLastName" type="text" autocomplete="family-name" /></label>
-          <label><span>Suffix <small>(if any)</small></span><input id="accountSuffix" type="text" autocomplete="honorific-suffix" placeholder="e.g. Jr. or IV" /></label>
-        </div>
-        <div id="hostSignInFields" hidden>
-          <label><span>Host password</span><input id="hostPassword" type="password" autocomplete="current-password" disabled /></label>
-        </div>
-        <p class="form-error" id="accountPasswordError" role="alert"></p>
-        <button class="primary-button" id="signInSubmit" value="default">Let's get started</button>
-        <button class="alternate-sign-in" id="hostPasswordToggle" type="button">OR ENTER PASSWORD</button>
-      </form>
-    </dialog>
 
     <dialog id="rsvpDialog">
       <form method="dialog" id="rsvpForm" class="modal-card">
@@ -161,6 +203,13 @@
         <div id="adminRegistryFields" class="admin-registry" hidden>
           <label><span>Wedding registry link</span><input id="adminRegistryUrl" type="url" placeholder="https://www.example.com/our-registry" /></label>
           <label><span>Monetary gift link</span><input id="adminMonetaryGiftUrl" type="url" placeholder="https://www.example.com/our-gift-fund" /></label>
+        </div>
+        <div id="adminAttireFields" class="admin-attire" hidden>
+          <h3>Formal attire tip videos</h3>
+          <p>Add YouTube or Vimeo links to display on the Wedding Attire page.</p>
+          <div id="adminAttireVideos"></div>
+          <div class="admin-video-add"><input id="adminNewAttireVideo" type="url" placeholder="https://www.youtube.com/watch?v=…" /><button id="adminAddAttireVideo" type="button">Add video</button></div>
+          <p class="form-error" id="adminAttireVideoError" role="alert"></p>
         </div>
         <div id="menuAdminFields">
         <div id="adminItems" class="admin-items"></div>
@@ -244,6 +293,7 @@
     </dialog>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    </div>
     <script src="app.js" defer></script>
   </body>
 </html>

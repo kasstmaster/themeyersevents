@@ -84,7 +84,7 @@ function initialAppState() {
     events: {
       thanksgiving: makeEvent(structuredClone(defaultItems), DEFAULT_EVENT_DATE),
       christmas: makeEvent(christmasItems(), DEFAULT_CHRISTMAS_DATE, CHRISTMAS_MENU_VERSION),
-      wedding: { ...makeEvent([], DEFAULT_WEDDING_DATE), registryUrl: DEFAULT_REGISTRY_URL, monetaryGiftUrl: '' }
+      wedding: { ...makeEvent([], DEFAULT_WEDDING_DATE), registryUrl: DEFAULT_REGISTRY_URL, monetaryGiftUrl: '', attireVideos: [] }
     }
   };
 }
@@ -171,6 +171,9 @@ function normalizeState(saved) {
       loaded.events.wedding.monetaryGiftUrl = typeof loaded.events.wedding.monetaryGiftUrl === 'string'
         ? loaded.events.wedding.monetaryGiftUrl
         : '';
+      loaded.events.wedding.attireVideos = Array.isArray(loaded.events.wedding.attireVideos)
+        ? loaded.events.wedding.attireVideos.filter(url => typeof url === 'string')
+        : [];
       return loaded;
     }
     // Upgrade the original single-Thanksgiving data. Keep its sign-ups so an
@@ -486,6 +489,39 @@ function setHostPasswordMode(enabled) {
   document.querySelector('#accountPasswordError').textContent = '';
   (enabled ? document.querySelector('#hostPassword') : document.querySelector('#accountFirstName')).focus();
 }
+function showSignInPage() {
+  const activeState = appState.events[appState.activeEventId];
+  const signInDate = new Date(`${activeState.eventDate}T12:00:00`);
+  const signInDateElement = document.querySelector('#signInEventDate');
+  signInDateElement.dateTime = activeState.eventDate;
+  signInDateElement.textContent = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(signInDate).replaceAll(',', '');
+  document.querySelector('#signInPage').hidden = false;
+  document.querySelector('#attirePage').hidden = true;
+  document.querySelector('#eventPage').hidden = true;
+}
+function videoEmbedUrl(url) {
+  try {
+    const parsed = new URL(url);
+    if (['youtube.com', 'www.youtube.com', 'm.youtube.com'].includes(parsed.hostname) && parsed.searchParams.get('v')) return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(parsed.searchParams.get('v'))}`;
+    if (parsed.hostname === 'youtu.be' && parsed.pathname.slice(1)) return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(parsed.pathname.slice(1))}`;
+    if (['vimeo.com', 'www.vimeo.com'].includes(parsed.hostname) && /^\/\d+/.test(parsed.pathname)) return `https://player.vimeo.com/video/${parsed.pathname.split('/')[1]}`;
+  } catch { return ''; }
+  return '';
+}
+function renderAttireVideoCollection(sectionSelector, containerSelector) {
+  const videos = (state.attireVideos || []).map(videoEmbedUrl).filter(Boolean);
+  document.querySelector(sectionSelector).hidden = videos.length === 0;
+  document.querySelector(containerSelector).innerHTML = videos.map((url, index) => `<iframe src="${escapeAttribute(url)}" title="Formal attire tip ${index + 1}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`).join('');
+}
+function showSignedInDestination() {
+  document.querySelector('#signInPage').hidden = true;
+  const showAttire = viewedEventId === 'wedding' && !hostAuthenticated;
+  document.querySelector('#attirePage').hidden = !showAttire;
+  document.querySelector('#eventPage').hidden = showAttire;
+  if (!showAttire) return;
+  renderAttireVideoCollection('#attireVideosSection', '#attireVideos');
+  document.querySelector('#attireHeading').focus?.();
+}
 function ensureAccount(callback) {
   if (guestName) return callback();
   if (hostAuthenticated) {
@@ -495,8 +531,7 @@ function ensureAccount(callback) {
   }
   pendingAccountAction = callback;
   hostToolsRequested = false;
-  const dialog = document.querySelector('#passwordDialog');
-  if (!dialog.open) dialog.showModal();
+  showSignInPage();
 }
 
 function render() {
@@ -528,6 +563,8 @@ function render() {
   document.querySelector('#copyMenuButton').hidden = state.items.length === 0;
   const registrySection = document.querySelector('#registrySection');
   registrySection.hidden = !isWedding;
+  document.querySelector('#registryAttireSection').hidden = !isWedding;
+  if (isWedding) renderAttireVideoCollection('#registryAttireVideosSection', '#registryAttireVideos');
   const registryButton = document.querySelector('#registryButton');
   registryButton.href = state.registryUrl || '#';
   registryButton.classList.toggle('disabled', !state.registryUrl);
@@ -642,7 +679,7 @@ document.querySelector('#passwordForm').addEventListener('submit', event => {
     pendingAccountAction = null;
     const shouldOpenHostTools = hostToolsRequested;
     hostToolsRequested = false;
-    document.querySelector('#passwordDialog').close();
+    showSignedInDestination();
     document.querySelector('#accountPasswordError').textContent = '';
     hostPasswordInput.value = '';
     render();
@@ -661,8 +698,8 @@ document.querySelector('#passwordForm').addEventListener('submit', event => {
   if (!accountCanSignIn(account, viewedEventId)) { document.querySelector('#accountPasswordError').textContent = 'This account is not currently invited.'; return; }
   guestName = account.name;
   document.querySelector('#accountPasswordError').textContent = '';
-  document.querySelector('#passwordDialog').close();
   render();
+  showSignedInDestination();
   const action = pendingAccountAction; pendingAccountAction = null; action?.();
 });
 document.querySelector('#hostPasswordToggle').addEventListener('click', () => {
@@ -745,8 +782,10 @@ function openAdmin() {
   document.querySelector('#adminHeading').textContent = isWedding ? 'Edit wedding details' : 'Edit the menu';
   document.querySelector('#adminDescription').textContent = isWedding ? 'Change the wedding date, registry link, or monetary gift link while previewing the invitation.' : 'Change the event date, sort the dishes, update requested amounts, or add something new.';
   document.querySelector('#adminRegistryFields').hidden = !isWedding;
+  document.querySelector('#adminAttireFields').hidden = !isWedding;
   document.querySelector('#adminRegistryUrl').value = state.registryUrl || '';
   document.querySelector('#adminMonetaryGiftUrl').value = state.monetaryGiftUrl || '';
+  if (isWedding) renderAdminAttireVideos();
   document.querySelector('#menuAdminFields').hidden = isWedding;
   document.querySelector('#adminNewUnit').innerHTML = unitOptions();
   renderQuantityUnits();
@@ -763,6 +802,12 @@ function openAdmin() {
     remove.addEventListener('click', () => { state.items = state.items.filter(i => i.id !== row.dataset.adminId); saveState(); openAdmin(); });
   });
   const dialog = document.querySelector('#adminDialog'); if (!dialog.open) dialog.showModal();
+}
+function renderAdminAttireVideos() {
+  const videos = state.attireVideos || [];
+  document.querySelector('#adminAttireVideos').innerHTML = videos.length
+    ? videos.map((url, index) => `<div class="admin-video-row"><a href="${escapeAttribute(url)}" target="_blank" rel="noopener noreferrer">Video ${index + 1}</a><button type="button" data-remove-attire-video="${index}" aria-label="Remove video ${index + 1}">Remove</button></div>`).join('')
+    : '<p class="guest-empty">No attire videos have been added.</p>';
 }
 function moveAdminItem(itemId, direction) {
   const itemIndex = state.items.findIndex(item => item.id === itemId);
@@ -861,12 +906,16 @@ function renameAccount(index, input) {
 document.querySelector('#hostToolsButton').addEventListener('click', () => {
   pendingAccountAction = null;
   if (hostAuthenticated) document.querySelector('#hostToolsDialog').showModal();
-  else if (!document.querySelector('#passwordDialog').open) {
+  else {
     hostToolsRequested = true;
-    document.querySelector('#passwordDialog').showModal();
+    showSignInPage();
+    setHostPasswordMode(true);
   }
 });
-document.querySelector('#passwordDialog').addEventListener('close', () => { hostToolsRequested = false; });
+document.querySelector('#signInSettingsButton').addEventListener('click', () => {
+  hostToolsRequested = true;
+  setHostPasswordMode(true);
+});
 function openEventsAdmin() {
   document.querySelector('#eventChoices').innerHTML = Object.entries(EVENT_DETAILS).map(([id, event]) => {
     const active = id === appState.activeEventId;
@@ -1022,6 +1071,27 @@ document.querySelector('#adminMonetaryGiftUrl').addEventListener('change', event
   saveState();
   showToast('Monetary gift link updated.');
 });
+document.querySelector('#adminAddAttireVideo').addEventListener('click', () => {
+  const input = document.querySelector('#adminNewAttireVideo');
+  const url = input.value.trim();
+  if (!videoEmbedUrl(url)) {
+    document.querySelector('#adminAttireVideoError').textContent = 'Enter a valid YouTube or Vimeo video link.';
+    return;
+  }
+  state.attireVideos ??= [];
+  state.attireVideos.push(url);
+  input.value = '';
+  document.querySelector('#adminAttireVideoError').textContent = '';
+  saveState();
+  renderAdminAttireVideos();
+});
+document.querySelector('#adminAttireVideos').addEventListener('click', event => {
+  const button = event.target.closest('[data-remove-attire-video]');
+  if (!button) return;
+  state.attireVideos.splice(Number(button.dataset.removeAttireVideo), 1);
+  saveState();
+  renderAdminAttireVideos();
+});
 document.querySelector('#adminAddUnitButton').addEventListener('click', () => {
   const input = document.querySelector('#adminNewUnitName');
   const label = input.value.trim();
@@ -1043,8 +1113,14 @@ async function startApp() {
   // retain the richest recoverable browser copy instead of replacing it.
   await loadSharedState();
   render();
-  document.querySelector('#passwordDialog').showModal();
+  showSignInPage();
 }
+
+document.querySelector('#acknowledgeAttireButton').addEventListener('click', () => {
+  document.querySelector('#attirePage').hidden = true;
+  document.querySelector('#eventPage').hidden = false;
+  document.querySelector('#rsvpButton').click();
+});
 
 render();
 startApp();
