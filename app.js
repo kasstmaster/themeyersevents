@@ -89,6 +89,10 @@ function initialAppState() {
   };
 }
 
+function accountCanSignIn(account, eventId) {
+  return account.alwaysInvite === true || account.selectedEvents?.[eventId] === true;
+}
+
 let appState = loadState();
 let viewedEventId = appState.activeEventId;
 let state = appState.events[viewedEventId];
@@ -110,11 +114,19 @@ function normalizeState(saved) {
         ...fresh,
         ...saved,
         activeEventId: saved.events[saved.activeEventId] ? saved.activeEventId : 'thanksgiving',
-        accounts: (Array.isArray(saved.accounts) ? saved.accounts : fresh.accounts).filter(account => account && typeof account.name === 'string').map(account => ({
-          ...account,
-          alwaysInvite: account.alwaysInvite === true,
-          selected: account.alwaysInvite === true || account.selected !== false
-        })),
+        accounts: (Array.isArray(saved.accounts) ? saved.accounts : fresh.accounts).filter(account => account && typeof account.name === 'string').map(account => {
+          const legacySelection = account.alwaysInvite === true || account.selected !== false;
+          return {
+            ...account,
+            alwaysInvite: account.alwaysInvite === true,
+            selectedEvents: Object.fromEntries(Object.keys(EVENT_DETAILS).map(eventId => [
+              eventId,
+              account.alwaysInvite === true || (typeof account.selectedEvents?.[eventId] === 'boolean'
+                ? account.selectedEvents[eventId]
+                : legacySelection)
+            ]))
+          };
+        }),
         events: { ...fresh.events, ...saved.events }
       };
       if (loaded.events.christmas.menuVersion !== CHRISTMAS_MENU_VERSION) {
@@ -174,7 +186,11 @@ function normalizeState(saved) {
       ...upgraded.events.thanksgiving.rsvps.map(rsvp => rsvp.name),
       ...upgraded.events.thanksgiving.items.flatMap(item => item.claims || [])
     ].filter(name => name && name !== HOST_DISPLAY_NAME));
-    upgraded.accounts = [...recoveredNames].map(name => ({ name, selected: true }));
+    upgraded.accounts = [...recoveredNames].map(name => ({
+      name,
+      selected: true,
+      selectedEvents: Object.fromEntries(Object.keys(EVENT_DETAILS).map(eventId => [eventId, true]))
+    }));
     return upgraded;
   } catch { return initialAppState(); }
 }
@@ -550,7 +566,7 @@ function render() {
     .join('');
   const needed = state.items.reduce((sum, item) => sum + (item.optional ? 0 : Math.max(0, item.needed - item.claims.length)), 0);
   const guests = state.rsvps.reduce((sum, rsvp) => sum + rsvp.adults + rsvp.children, 0);
-  const invitedAccounts = appState.accounts.filter(account => account.selected);
+  const invitedAccounts = appState.accounts.filter(account => accountCanSignIn(account, viewedEventId));
   document.querySelector('#guestCount').textContent = guests;
   document.querySelector('#invitedCount').textContent = invitedAccounts.length;
   document.querySelector('#remainingCount').textContent = needed;
@@ -642,7 +658,7 @@ document.querySelector('#passwordForm').addEventListener('submit', event => {
   if (!firstName || !lastName) { document.querySelector('#accountPasswordError').textContent = 'Enter your first and last name, plus your suffix if you have one.'; return; }
   const account = appState.accounts.find(entry => accountNameMatches(accountName, entry.name));
   if (!account) { document.querySelector('#accountPasswordError').textContent = 'That name and suffix are not recognized.'; return; }
-  if (!account.selected) { document.querySelector('#accountPasswordError').textContent = 'This account is not currently invited.'; return; }
+  if (!accountCanSignIn(account, viewedEventId)) { document.querySelector('#accountPasswordError').textContent = 'This account is not currently invited.'; return; }
   guestName = account.name;
   document.querySelector('#accountPasswordError').textContent = '';
   document.querySelector('#passwordDialog').close();
@@ -716,7 +732,7 @@ document.querySelector('#guestListButton').addEventListener('click', () => {
 document.querySelector('#invitedListButton').addEventListener('click', () => {
   if (!hostAuthenticated) return;
   const invitedAccounts = appState.accounts
-    .filter(account => account.selected)
+    .filter(account => accountCanSignIn(account, viewedEventId))
     .sort((left, right) => left.name.localeCompare(right.name));
   document.querySelector('#invitedList').innerHTML = invitedAccounts.length
     ? invitedAccounts.map(account => `<div class="guest-entry"><strong>${escapeHtml(invitedAccountDisplayName(account.name))}</strong></div>`).join('')
@@ -788,21 +804,26 @@ function renderQuantityUnits() {
 }
 function openAccountsAdmin() {
   document.querySelector('#adminAccountError').textContent = '';
+  document.querySelector('#accountsDescription').textContent = `Account names and Always Invite are shared by every event. Can sign in applies only to ${EVENT_DETAILS[viewedEventId].name}.`;
   const sortedAccounts = appState.accounts.map((account, index) => ({ account, index })).sort((left, right) =>
     firstAccountLastName(left.account.name).localeCompare(firstAccountLastName(right.account.name), 'en-US', { sensitivity: 'base' })
     || left.account.name.localeCompare(right.account.name, 'en-US', { sensitivity: 'base' }));
-  document.querySelector('#adminAccounts').innerHTML = sortedAccounts.length ? sortedAccounts.map(({ account, index }) => `<div class="account-row" data-account-index="${index}"><div class="account-access"><label class="account-selection"><input class="account-selected" type="checkbox" ${account.selected ? 'checked' : ''} ${account.alwaysInvite ? 'disabled' : ''}><span>Can sign in</span></label><label class="account-selection"><input class="account-always-invite" type="checkbox" ${account.alwaysInvite ? 'checked' : ''}><span>Always Invite</span></label></div><input value="${escapeAttribute(account.name)}" maxlength="120" aria-label="Account name"><button type="button" aria-label="Delete ${escapeAttribute(account.name)} account">×</button></div>`).join('') : '<p class="guest-empty">No guest accounts yet.</p>';
+  document.querySelector('#adminAccounts').innerHTML = sortedAccounts.length ? sortedAccounts.map(({ account, index }) => `<div class="account-row" data-account-index="${index}"><div class="account-access"><label class="account-selection"><input class="account-selected" type="checkbox" ${accountCanSignIn(account, viewedEventId) ? 'checked' : ''} ${account.alwaysInvite ? 'disabled' : ''}><span>Can sign in</span></label><label class="account-selection"><input class="account-always-invite" type="checkbox" ${account.alwaysInvite ? 'checked' : ''}><span>Always Invite</span></label></div><input value="${escapeAttribute(account.name)}" maxlength="120" aria-label="Account name"><button type="button" aria-label="Delete ${escapeAttribute(account.name)} account">×</button></div>`).join('') : '<p class="guest-empty">No guest accounts yet.</p>';
   document.querySelectorAll('.account-row').forEach(row => {
     const [access, name, remove] = row.children;
     access.querySelector('.account-selected').addEventListener('change', event => {
-      appState.accounts[Number(row.dataset.accountIndex)].selected = event.target.checked;
-      if (!event.target.checked && guestName === appState.accounts[Number(row.dataset.accountIndex)].name) guestName = '';
+      const account = appState.accounts[Number(row.dataset.accountIndex)];
+      account.selectedEvents ??= {};
+      account.selectedEvents[viewedEventId] = event.target.checked;
+      if (!event.target.checked && guestName === account.name) guestName = '';
       saveState();
     });
     access.querySelector('.account-always-invite').addEventListener('change', event => {
       const account = appState.accounts[Number(row.dataset.accountIndex)];
       account.alwaysInvite = event.target.checked;
-      if (account.alwaysInvite) account.selected = true;
+      if (account.alwaysInvite) {
+        account.selectedEvents = Object.fromEntries(Object.keys(EVENT_DETAILS).map(eventId => [eventId, true]));
+      }
       saveState();
       openAccountsAdmin();
     });
@@ -986,7 +1007,7 @@ document.querySelector('#adminAddAccountButton').addEventListener('click', () =>
   const name = input.value.trim();
   if (!name) { document.querySelector('#adminAccountError').textContent = 'Enter a last name.'; return; }
   if (appState.accounts.some(account => normalizeAccountName(account.name) === normalizeAccountName(name))) { document.querySelector('#adminAccountError').textContent = 'That account already exists.'; return; }
-  appState.accounts.push({ name, selected: false, alwaysInvite: false }); input.value = ''; saveState(); openAccountsAdmin(); showToast(`${householdDisplayName(name)} account added. Enable it to allow sign-in.`);
+  appState.accounts.push({ name, selected: false, selectedEvents: { [viewedEventId]: false }, alwaysInvite: false }); input.value = ''; saveState(); openAccountsAdmin(); showToast(`${householdDisplayName(name)} account added. Enable it to allow sign-in.`);
 });
 document.querySelector('#adminEventDate').addEventListener('change', event => { if (!event.target.value) return; state.eventDate = event.target.value; state.accountSelectionResetFor = ''; saveState(); showToast('Event date updated.'); });
 document.querySelector('#adminRegistryUrl').addEventListener('change', event => {

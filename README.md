@@ -73,7 +73,7 @@ shared copy; browser storage is only an offline fallback.
 
 ## Customize
 
-- Select **Settings** and enter the host password, then use **Manage events** to make either Thanksgiving or Christmas visible to guests. The inactive event stays hidden. Each event keeps its own date, menu, claims, and RSVPs, while the family account list is shared. You can also edit the active event menu, clear a selected quantity of a family's dish claim, manage accounts, RSVP, and claim dishes as **The Host**. After the host signs in, the button is labeled **Host tools**.
+- Select **Settings** and enter the host password, then use **Manage events** to choose which event is visible to guests. Inactive events stay hidden but can be previewed by the host. Each event keeps its own date, menu, claims, RSVPs, and **Can sign in** selections, while account names and other account settings are shared. Thus, managing accounts while previewing Wedding changes Wedding access even when another event is live. You can also edit the viewed event menu, clear a selected quantity of a family's dish claim, RSVP, and claim dishes as **The Host**. After the host signs in, the button is labeled **Host tools**.
 - Update `HOST_PASSWORD` near the top of `app.js` (the current password is `0810`). Host password matching is case-insensitive.
 - Guest names and RSVP details are private in the interface: only a signed-in host can open the guest list or see who claimed a food item. Guests can still see the aggregate attendance and dish counts.
 - `GUEST_ACCOUNTS` in `app.js` supplies the initial invited households. You can then manage accounts from **Host tools** without editing code. Write shared first names with commas and separate households with a slash. For example, `Damon,Presley Patterson/Presley,Damon Hall` lets Damon Patterson, Presley Patterson, Presley Hall, and Damon Hall sign in with their own first and last names. RSVP and food entries use the first household's last name, so this example appears as **The Pattersons**. A last name ending in `s`, such as `Stevens`, appears as **The Stevens'**. Matching is case-insensitive.
@@ -153,4 +153,3 @@ read and write the live state in `kasstmaster/themeyersevents-data`.
 Then deploy the Worker manually and push the workflow. No deployment is
 performed by this repository change. Sync logs include counts and outcomes but
 never credentials, cookies, authorization headers, or token values.
-
