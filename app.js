@@ -84,7 +84,7 @@ function initialAppState() {
     events: {
       thanksgiving: makeEvent(structuredClone(defaultItems), DEFAULT_EVENT_DATE),
       christmas: makeEvent(christmasItems(), DEFAULT_CHRISTMAS_DATE, CHRISTMAS_MENU_VERSION),
-      wedding: { ...makeEvent([], DEFAULT_WEDDING_DATE), registryUrl: DEFAULT_REGISTRY_URL }
+      wedding: { ...makeEvent([], DEFAULT_WEDDING_DATE), registryUrl: DEFAULT_REGISTRY_URL, monetaryGiftUrl: '' }
     }
   };
 }
@@ -156,6 +156,9 @@ function normalizeState(saved) {
         if (!eventState.quantityUnits.length) eventState.quantityUnits = structuredClone(DEFAULT_QUANTITY_UNITS);
       });
       loaded.events.wedding.registryUrl = loaded.events.wedding.registryUrl || DEFAULT_REGISTRY_URL;
+      loaded.events.wedding.monetaryGiftUrl = typeof loaded.events.wedding.monetaryGiftUrl === 'string'
+        ? loaded.events.wedding.monetaryGiftUrl
+        : '';
       return loaded;
     }
     // Upgrade the original single-Thanksgiving data. Keep its sign-ups so an
@@ -514,9 +517,14 @@ function render() {
   registryButton.classList.toggle('disabled', !state.registryUrl);
   registryButton.setAttribute('aria-disabled', String(!state.registryUrl));
   registryButton.textContent = state.registryUrl ? 'View our registry' : (hostAuthenticated ? 'Add registry link in host tools' : 'Registry coming soon');
+  const monetaryGiftButton = document.querySelector('#monetaryGiftButton');
+  monetaryGiftButton.href = state.monetaryGiftUrl || '#';
+  monetaryGiftButton.classList.toggle('disabled', !state.monetaryGiftUrl);
+  monetaryGiftButton.setAttribute('aria-disabled', String(!state.monetaryGiftUrl));
+  monetaryGiftButton.textContent = state.monetaryGiftUrl ? 'Give a monetary gift' : (hostAuthenticated ? 'Add monetary gift link in host tools' : 'Monetary gifts coming soon');
   const editItemsButton = document.querySelector('#editItemsButton');
   editItemsButton.querySelector('strong').textContent = isWedding ? 'Edit wedding details' : 'Edit menu items';
-  editItemsButton.querySelector('span').textContent = isWedding ? 'Update the date or registry link' : 'Add, change, or remove dishes';
+  editItemsButton.querySelector('span').textContent = isWedding ? 'Update the date or gift links' : 'Add, change, or remove dishes';
   document.querySelector('#clearClaimButton').hidden = isWedding;
   let previewBanner = document.querySelector('#previewBanner');
   if (!previewBanner) {
@@ -719,9 +727,10 @@ function openAdmin() {
   const isWedding = EVENT_DETAILS[viewedEventId].registryOnly === true;
   document.querySelector('#adminEventDate').value = state.eventDate;
   document.querySelector('#adminHeading').textContent = isWedding ? 'Edit wedding details' : 'Edit the menu';
-  document.querySelector('#adminDescription').textContent = isWedding ? 'Change the wedding date or registry link while previewing the invitation.' : 'Change the event date, sort the dishes, update requested amounts, or add something new.';
-  document.querySelector('#adminRegistryField').hidden = !isWedding;
+  document.querySelector('#adminDescription').textContent = isWedding ? 'Change the wedding date, registry link, or monetary gift link while previewing the invitation.' : 'Change the event date, sort the dishes, update requested amounts, or add something new.';
+  document.querySelector('#adminRegistryFields').hidden = !isWedding;
   document.querySelector('#adminRegistryUrl').value = state.registryUrl || '';
+  document.querySelector('#adminMonetaryGiftUrl').value = state.monetaryGiftUrl || '';
   document.querySelector('#menuAdminFields').hidden = isWedding;
   document.querySelector('#adminNewUnit').innerHTML = unitOptions();
   renderQuantityUnits();
@@ -985,6 +994,12 @@ document.querySelector('#adminRegistryUrl').addEventListener('change', event => 
   state.registryUrl = event.target.value.trim();
   saveState();
   showToast('Registry link updated.');
+});
+document.querySelector('#adminMonetaryGiftUrl').addEventListener('change', event => {
+  if (EVENT_DETAILS[viewedEventId].registryOnly !== true) return;
+  state.monetaryGiftUrl = event.target.value.trim();
+  saveState();
+  showToast('Monetary gift link updated.');
 });
 document.querySelector('#adminAddUnitButton').addEventListener('click', () => {
   const input = document.querySelector('#adminNewUnitName');
