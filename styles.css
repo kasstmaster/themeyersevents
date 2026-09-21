@@ -91,8 +91,8 @@ dialog{border:0;padding:0;background:transparent;max-width:95vw}dialog::backdrop
 .theme-wedding .host-tools-button{position:absolute;background:rgba(201,190,170,.9);border-color:var(--dress-bronze);color:var(--dress-espresso)}
 .theme-wedding .host-tools-button:hover{background:var(--dress-champagne);border-color:var(--dress-espresso)}
 .theme-wedding .event-date{order:-1;margin:0;color:var(--dress-espresso);text-shadow:0 1px 0 rgba(255,255,255,.3)}
-.theme-wedding .header-art{max-width:900px}
-.theme-wedding .header-art img{width:900px;max-width:100%}
+.theme-wedding .header-art{max-width:420px}
+.theme-wedding .header-art img{width:420px;max-width:100%}
 .theme-wedding .section-kicker{color:var(--gold)}
 .theme-wedding .registry-section .section-kicker{color:var(--navy)}
 .theme-wedding .summary-strip strong{color:var(--gold)}
