@@ -24,6 +24,20 @@ test('ignores a note and category address', () => {
 
 test('converts one-person household', () => assert.equal(convertCategory('RAUDMAN', [{ name: 'Buddy Raudman' }]).account, 'Buddy Raudman'));
 
+test('every person in a multi-household account has a sign-in name', () => {
+  assert.deepEqual(
+    accountPeople('Leonna,Brady Baker/Robert Pulido/Selena Fuller'),
+    ['Leonna Baker', 'Brady Baker', 'Robert Pulido', 'Selena Fuller']
+  );
+});
+
+test('mixed compact and full names do not borrow the final person surname', () => {
+  assert.deepEqual(
+    accountPeople('Leonna,Brady Baker,Robert Pulido,Selena Fuller'),
+    ['Leonna Baker', 'Brady Baker', 'Robert Pulido', 'Selena Fuller']
+  );
+});
+
 test('normalized people prevent spacing and case duplicates', () => {
   const state = { accounts: [{ name: 'Josh,Julie,Aiden Wickendoll', selected: false }] };
   assert.deepEqual(addMissingAccounts(state, [' josh, Julie, Aiden  WICKENDOLL ']), []);
