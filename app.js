@@ -490,11 +490,6 @@ function setHostPasswordMode(enabled) {
   (enabled ? document.querySelector('#hostPassword') : document.querySelector('#accountFirstName')).focus();
 }
 function showSignInPage() {
-  const activeState = appState.events[appState.activeEventId];
-  const signInDate = new Date(`${activeState.eventDate}T12:00:00`);
-  const signInDateElement = document.querySelector('#signInEventDate');
-  signInDateElement.dateTime = activeState.eventDate;
-  signInDateElement.textContent = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(signInDate).replaceAll(',', '');
   document.querySelector('#signInPage').hidden = false;
   document.querySelector('#attirePage').hidden = true;
   document.querySelector('#eventPage').hidden = true;
