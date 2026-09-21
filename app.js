@@ -1123,6 +1123,17 @@ document.querySelector('#acknowledgeAttireButton').addEventListener('click', () 
   document.querySelector('#rsvpButton').click();
 });
 
+document.querySelectorAll('.affordable-attire-toggle').forEach(button => {
+  button.addEventListener('click', () => {
+    const details = button.nextElementSibling;
+    const isOpening = details.hidden;
+    details.hidden = !isOpening;
+    button.setAttribute('aria-expanded', String(isOpening));
+    button.textContent = isOpening ? 'Hide Affordable Attire' : 'Find Affordable Attire';
+    if (isOpening) details.querySelector('h2, h3')?.focus?.({ preventScroll: true });
+  });
+});
+
 render();
 startApp();
 singleColumnMenu.addEventListener('change', render);
