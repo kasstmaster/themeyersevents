@@ -513,9 +513,9 @@ function renderAttireVideoCollection(sectionSelector, containerSelector) {
   document.querySelector(sectionSelector).hidden = videos.length === 0;
   document.querySelector(containerSelector).innerHTML = videos.map((url, index) => `<iframe src="${escapeAttribute(url)}" title="Formal attire tip ${index + 1}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>`).join('');
 }
-function showSignedInDestination() {
+function showSignedInDestination(forceAttire = false) {
   document.querySelector('#signInPage').hidden = true;
-  const showAttire = viewedEventId === 'wedding' && !hostAuthenticated;
+  const showAttire = viewedEventId === 'wedding' && (!hostAuthenticated || forceAttire);
   document.querySelector('#attirePage').hidden = !showAttire;
   document.querySelector('#eventPage').hidden = showAttire;
   if (!showAttire) return;
@@ -930,6 +930,7 @@ function openEventsAdmin() {
     guestName = HOST_DISPLAY_NAME;
     document.querySelector('#eventsDialog').close();
     render();
+    showSignedInDestination(viewedEventId === 'wedding');
     showToast(`Previewing ${EVENT_DETAILS[viewedEventId].name}. Guests still see ${EVENT_DETAILS[appState.activeEventId].name}.`);
   }));
   document.querySelectorAll('[data-activate-event]').forEach(button => button.addEventListener('click', () => {
