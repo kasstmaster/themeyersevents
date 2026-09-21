@@ -103,7 +103,7 @@ dialog{border:0;padding:0;background:transparent;max-width:95vw}dialog::backdrop
 .registry-section h2{font-family:"Times New Roman",Times,serif;color:var(--orange);font-size:clamp(2.2rem,5vw,3.5rem);margin:0 0 10px}
 .registry-section p:not(.section-kicker){color:var(--muted);margin:0 0 26px}
 .registry-gift-note{max-width:780px;margin:34px auto 32px;padding:30px;text-align:left;background:rgba(255,255,255,.55);border:1px solid var(--border);border-radius:6px}
-.registry-gift-note h3{margin:0 0 22px;color:var(--navy);font-family:"Times New Roman",Times,serif;font-size:clamp(1.25rem,2.5vw,1.65rem);line-height:1.25;text-align:center;text-transform:uppercase;letter-spacing:.04em}
+.registry-gift-note-heading{margin:0 0 22px;color:var(--navy);font-family:"Times New Roman",Times,serif;font-size:clamp(1.25rem,2.5vw,1.65rem);line-height:1.25;text-align:center;text-transform:uppercase;letter-spacing:.04em}
 .registry-section .registry-gift-note p{margin:0 0 16px;line-height:1.65}
 .registry-section .registry-gift-note p:last-child{margin-bottom:0}
 .registry-gift-highlight{color:var(--orange)}
