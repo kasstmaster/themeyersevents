@@ -102,7 +102,7 @@ function activeEventIds(source = appState) {
 function availableEventIds(accountName = guestName) {
   const ids = activeEventIds();
   if (hostAuthenticated || accountName === HOST_DISPLAY_NAME) return ids;
-  const account = appState.accounts.find(entry => accountNameMatches(accountName, entry.name));
+  const account = findAccount(accountName);
   return account ? ids.filter(id => accountCanSignIn(account, id)) : [];
 }
 
@@ -433,6 +433,13 @@ function accountNameMatches(enteredName, accountName) {
   const normalizedEntry = normalizeAccountName(enteredName);
   return accountSignInNames(accountName).some(name => normalizeAccountName(name) === normalizedEntry);
 }
+function findAccount(name) {
+  const normalizedName = normalizeAccountName(name);
+  // Once signed in, guestName contains the complete stored household account
+  // (which can include commas or slashes), not one person's sign-in name.
+  return appState.accounts.find(account => normalizeAccountName(account.name) === normalizedName)
+    || appState.accounts.find(account => accountNameMatches(name, account.name));
+}
 function showToast(message) { const toast = document.querySelector('#toast'); toast.textContent = message; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2600); }
 function menuItemSummary(item) {
   const claimCounts = item.claims.reduce((counts, name) => counts.set(name, (counts.get(name) || 0) + 1), new Map());
@@ -734,9 +741,9 @@ document.querySelector('#passwordForm').addEventListener('submit', event => {
   const suffix = document.querySelector('#accountSuffix').value.trim();
   const accountName = [firstName, lastName, suffix].filter(Boolean).join(' ');
   if (!firstName || !lastName) { document.querySelector('#accountPasswordError').textContent = 'Enter your first and last name, plus your suffix if you have one.'; return; }
-  const account = appState.accounts.find(entry => accountNameMatches(accountName, entry.name));
+  const account = findAccount(accountName);
   if (!account) { document.querySelector('#accountPasswordError').textContent = 'That name and suffix are not recognized.'; return; }
-  if (!activeEventIds().some(id => accountCanSignIn(account, id))) { document.querySelector('#accountPasswordError').textContent = 'This account is not currently invited to an active event.'; return; }
+  if (!activeEventIds().some(id => accountCanSignIn(account, id))) { document.querySelector('#accountPasswordError').textContent = 'No active events'; return; }
   guestName = account.name;
   document.querySelector('#accountPasswordError').textContent = '';
   showEventSelection();
