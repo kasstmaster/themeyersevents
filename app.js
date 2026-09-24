@@ -1188,7 +1188,9 @@ async function startApp() {
 document.querySelector('#acknowledgeAttireButton').addEventListener('click', () => {
   document.querySelector('#attirePage').hidden = true;
   document.querySelector('#eventPage').hidden = false;
-  document.querySelector('#rsvpButton').click();
+  // Enter the gathering at its beginning and let guests open the RSVP form
+  // themselves when they are ready.
+  window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
 });
 
 document.querySelectorAll('.affordable-attire-toggle').forEach(button => {
@@ -1198,7 +1200,12 @@ document.querySelectorAll('.affordable-attire-toggle').forEach(button => {
     details.hidden = !isOpening;
     button.setAttribute('aria-expanded', String(isOpening));
     button.textContent = isOpening ? 'Hide Affordable Attire' : 'Find Affordable Attire';
-    if (isOpening) details.querySelector('h2, h3')?.focus?.({ preventScroll: true });
+    if (isOpening) {
+      details.querySelector('h2, h3')?.focus?.({ preventScroll: true });
+      // Move the newly revealed guidance comfortably into view without
+      // jumping past its heading or taking the guest far down the page.
+      window.scrollBy({ top: 160, left: 0, behavior: 'smooth' });
+    }
   });
 });
 
