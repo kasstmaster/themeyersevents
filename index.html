@@ -41,6 +41,16 @@
       </div>
     </section>
 
+    <section id="eventSelectionPage" class="event-selection-page theme-wedding" aria-labelledby="eventSelectionHeading" hidden>
+      <div class="event-selection-card">
+        <p class="section-kicker">Welcome to The Meyers' events</p>
+        <h1 id="eventSelectionHeading">Choose an event</h1>
+        <p>Select an active event you are invited to. You can switch events at any time from the bar at the bottom of the screen.</p>
+        <div id="eventSelectionChoices" class="event-selection-choices"></div>
+        <p id="eventSelectionEmpty" class="event-selection-empty" hidden>There are no active events available for this account right now.</p>
+      </div>
+    </section>
+
     <section id="attirePage" class="attire-page" aria-labelledby="attireHeading" hidden>
       <div class="attire-header">
         <img src="https://i.ibb.co/KjtXKDRn/Wedding-Header-Website-No-Border.png" alt="Kassandra and Steven wedding" decoding="async" />
@@ -186,6 +196,8 @@
       </address>
     </footer>
 
+    <nav id="eventDock" class="event-dock" aria-label="Switch active event" hidden></nav>
+
     <dialog id="rsvpDialog">
       <form method="dialog" id="rsvpForm" class="modal-card">
         <button class="modal-close" value="cancel" aria-label="Close">×</button>
@@ -288,7 +300,7 @@
         <p>Choose the live event, then manage its menu or your shared family accounts.</p>
         <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
         <div class="host-tool-actions">
-          <button id="manageEventsButton" type="button"><strong>Manage events</strong><span>Choose which holiday guests can see</span></button>
+          <button id="manageEventsButton" type="button"><strong>Manage events</strong><span>Choose which events are active for invited guests</span></button>
           <button id="editItemsButton" type="button"><strong>Edit menu items</strong><span>Add, change, or remove dishes</span></button>
           <button id="clearClaimButton" type="button"><strong>Clear a claim</strong><span>Remove a dish quantity from a family</span></button>
           <button id="editAccountsButton" type="button"><strong>Manage accounts</strong><span>Choose which families can sign in</span></button>
@@ -313,7 +325,7 @@
       <form method="dialog" class="modal-card">
         <button class="modal-close" value="cancel" aria-label="Close">×</button>
         <p class="section-kicker">Host dashboard</p><h2>Manage events</h2>
-        <p>Only the active event is visible to guests. Preview any event privately before making it live.</p>
+        <p>Activate any events guests may enter. Each family will only see active events they are invited to.</p>
         <div id="eventChoices" class="event-choices"></div>
         <button class="primary-button" value="default">Done</button>
       </form>
