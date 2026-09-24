@@ -9,7 +9,7 @@
     <meta name="shared-state-url" content="https://curly-sun-ef0f.kassandraraudman.workers.dev" />
     <!-- This checked-in file is the cross-device fallback when no worker is configured. -->
     <meta name="repository-state-url" content="data/app-state.json" />
-    <title>The Meyers Family Events</title>
+    <title>The Meyers Gatherings</title>
     <link rel="preconnect" href="https://i.postimg.cc" crossorigin />
     <link rel="stylesheet" href="styles.css" />
   </head>
@@ -25,7 +25,7 @@
         <form id="passwordForm" class="sign-in-card">
           <p class="section-kicker">Welcome</p>
           <h1 id="signInHeading">What's your name?</h1>
-          <p class="sign-in-intro">Sign in to view the current Meyers family event.</p>
+          <p class="sign-in-intro">Sign in to view the current Meyers gathering.</p>
           <div class="name-fields" id="guestSignInFields">
             <label><span>First name</span><input id="accountFirstName" type="text" autocomplete="given-name" required /></label>
             <label><span>Last name</span><input id="accountLastName" type="text" autocomplete="family-name" /></label>
@@ -43,11 +43,11 @@
 
     <section id="eventSelectionPage" class="event-selection-page theme-wedding" aria-labelledby="eventSelectionHeading" hidden>
       <div class="event-selection-card">
-        <h1 id="eventSelectionHeading">Welcome to The Meyers' events</h1>
+        <h1 id="eventSelectionHeading">Welcome to The Meyers Gatherings</h1>
         <p class="event-selection-intro">It is our pleasure to share these special occasions with the people we hold dear.</p>
-        <p>Please select an event to start with. You can switch events at any time.</p>
+        <p>Please select a gathering to start with. You can switch gatherings at any time.</p>
         <div id="eventSelectionChoices" class="event-selection-choices"></div>
-        <p id="eventSelectionEmpty" class="event-selection-empty" hidden>There are no active events available for this account right now.</p>
+        <p id="eventSelectionEmpty" class="event-selection-empty" hidden>There are no active gatherings available right now.</p>
       </div>
     </section>
 
@@ -256,8 +256,8 @@
       <form method="dialog" class="modal-card">
         <button class="modal-close" value="cancel" aria-label="Close">×</button>
         <p class="section-kicker">Host dashboard</p><h2 id="adminHeading">Edit the menu</h2>
-        <p id="adminDescription">Change the event date, requested amounts, dish names, or add something new.</p>
-        <label class="admin-date"><span>Event date</span><input id="adminEventDate" type="date" required /></label>
+        <p id="adminDescription">Change the gathering date, requested amounts, dish names, or add something new.</p>
+        <label class="admin-date"><span>Gathering date</span><input id="adminEventDate" type="date" required /></label>
         <div id="adminRegistryFields" class="admin-registry" hidden>
           <label><span>Wedding registry link</span><input id="adminRegistryUrl" type="url" placeholder="https://www.example.com/our-registry" /></label>
           <label><span>Monetary gift link</span><input id="adminMonetaryGiftUrl" type="url" placeholder="https://www.example.com/our-gift-fund" /></label>
@@ -297,10 +297,10 @@
       <form method="dialog" class="modal-card">
         <button class="modal-close" value="cancel" aria-label="Close">×</button>
         <p class="section-kicker">Host dashboard</p><h2>What would you like to edit?</h2>
-        <p>Choose the live event, then manage its menu or your shared family accounts.</p>
+        <p>Choose the live gathering, then manage its menu or your shared family accounts.</p>
         <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
         <div class="host-tool-actions">
-          <button id="manageEventsButton" type="button"><strong>Manage events</strong><span>Choose which events are active for invited guests</span></button>
+          <button id="manageEventsButton" type="button"><strong>Manage gatherings</strong><span>Choose which gatherings are active for invited guests</span></button>
           <button id="editItemsButton" type="button"><strong>Edit menu items</strong><span>Add, change, or remove dishes</span></button>
           <button id="clearClaimButton" type="button"><strong>Clear a claim</strong><span>Remove a dish quantity from a family</span></button>
           <button id="editAccountsButton" type="button"><strong>Manage accounts</strong><span>Choose which families can sign in</span></button>
@@ -324,8 +324,8 @@
     <dialog id="eventsDialog">
       <form method="dialog" class="modal-card">
         <button class="modal-close" value="cancel" aria-label="Close">×</button>
-        <p class="section-kicker">Host dashboard</p><h2>Manage events</h2>
-        <p>Activate any events guests may enter. Each family will only see active events they are invited to.</p>
+        <p class="section-kicker">Host dashboard</p><h2>Manage gatherings</h2>
+        <p>Activate any gatherings guests may enter. Each family will only see active gatherings they are invited to.</p>
         <div id="eventChoices" class="event-choices"></div>
         <button class="primary-button" value="default">Done</button>
       </form>
@@ -335,7 +335,7 @@
       <form method="dialog" class="modal-card">
         <button class="modal-close" value="cancel" aria-label="Close">×</button>
         <p class="section-kicker">Host dashboard</p><h2>Manage accounts</h2>
-        <p id="accountsDescription">Account details are shared by every event. Sign-in access applies to the event you are viewing.</p>
+        <p id="accountsDescription">Account details are shared by every gathering. Sign-in access applies to the gathering you are viewing.</p>
         <div id="adminAccounts" class="admin-accounts"></div>
         <div class="account-add">
           <input id="adminNewAccount" placeholder="e.g. John,Jane Doe/John,Jane Smith" maxlength="120" aria-label="New account name" />
