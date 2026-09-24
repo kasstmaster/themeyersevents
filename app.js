@@ -662,7 +662,10 @@ function renderEventDock() {
   const dock = document.querySelector('#eventDock');
   const ids = availableEventIds();
   dock.hidden = !guestName || ids.length === 0;
-  dock.innerHTML = ids.map(id => `<button type="button" data-switch-event="${id}" ${id === viewedEventId ? 'aria-current="page"' : ''}><span>${escapeHtml(EVENT_DETAILS[id].name)}</span></button>`).join('');
+  dock.innerHTML = ids.map(id => {
+    const label = `Switch to ${EVENT_DETAILS[id].name}`;
+    return `<button type="button" data-switch-event="${id}" title="${escapeHtml(label)}" ${id === viewedEventId ? 'aria-current="page"' : ''}><span>${escapeHtml(label)}</span></button>`;
+  }).join('');
 }
 function renderDish(item) {
   const mine = guestName && item.claims.includes(guestName);
