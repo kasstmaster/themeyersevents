@@ -78,6 +78,7 @@ function makeEvent(items, eventDate, menuVersion) { return { items, rsvps: [], e
 function initialAppState() {
   return {
     activeEventId: 'thanksgiving',
+    activeEventIds: ['thanksgiving'],
     accountResetVersion: ACCOUNT_RESET_VERSION,
     signupResetVersion: SIGNUP_RESET_VERSION,
     accounts: structuredClone(GUEST_ACCOUNTS),
@@ -91,6 +92,18 @@ function initialAppState() {
 
 function accountCanSignIn(account, eventId) {
   return account.alwaysInvite === true || account.selectedEvents?.[eventId] === true;
+}
+
+function activeEventIds(source = appState) {
+  const ids = Array.isArray(source.activeEventIds) ? source.activeEventIds : [source.activeEventId];
+  return [...new Set(ids)].filter(id => source.events?.[id] && EVENT_DETAILS[id]);
+}
+
+function availableEventIds(accountName = guestName) {
+  const ids = activeEventIds();
+  if (hostAuthenticated || accountName === HOST_DISPLAY_NAME) return ids;
+  const account = appState.accounts.find(entry => accountNameMatches(accountName, entry.name));
+  return account ? ids.filter(id => accountCanSignIn(account, id)) : [];
 }
 
 let appState = loadState();
@@ -114,6 +127,8 @@ function normalizeState(saved) {
         ...fresh,
         ...saved,
         activeEventId: saved.events[saved.activeEventId] ? saved.activeEventId : 'thanksgiving',
+        activeEventIds: (Array.isArray(saved.activeEventIds) ? saved.activeEventIds : [saved.activeEventId])
+          .filter(id => saved.events[id] && EVENT_DETAILS[id]),
         accounts: (Array.isArray(saved.accounts) ? saved.accounts : fresh.accounts).filter(account => account && typeof account.name === 'string').map(account => {
           const legacySelection = account.alwaysInvite === true || account.selected !== false;
           return {
@@ -129,6 +144,8 @@ function normalizeState(saved) {
         }),
         events: { ...fresh.events, ...saved.events }
       };
+      if (!loaded.activeEventIds.length && loaded.activeEventId) loaded.activeEventIds = [loaded.activeEventId];
+      loaded.activeEventId = loaded.activeEventIds[0] || loaded.activeEventId;
       if (loaded.events.christmas.menuVersion !== CHRISTMAS_MENU_VERSION) {
         const previousClaims = new Map(loaded.events.christmas.items.map(item => [item.id, item.claims]));
         loaded.events.christmas.items = christmasItems().map(item => ({ ...item, claims: previousClaims.get(item.id) || [] }));
@@ -491,8 +508,28 @@ function setHostPasswordMode(enabled) {
 }
 function showSignInPage() {
   document.querySelector('#signInPage').hidden = false;
+  document.querySelector('#eventSelectionPage').hidden = true;
   document.querySelector('#attirePage').hidden = true;
   document.querySelector('#eventPage').hidden = true;
+}
+function renderEventSelection() {
+  const ids = availableEventIds();
+  document.querySelector('#eventSelectionChoices').innerHTML = ids.map(id => {
+    const event = EVENT_DETAILS[id];
+    const eventState = appState.events[id];
+    const date = new Date(`${eventState.eventDate}T12:00:00`);
+    const formatted = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(date).replaceAll(',', '');
+    return `<button type="button" data-enter-event="${id}"><span>${escapeHtml(event.name)}</span><small>${formatted}</small></button>`;
+  }).join('');
+  document.querySelector('#eventSelectionEmpty').hidden = ids.length > 0;
+}
+function showEventSelection() {
+  renderEventSelection();
+  document.querySelector('#signInPage').hidden = true;
+  document.querySelector('#attirePage').hidden = true;
+  document.querySelector('#eventPage').hidden = true;
+  document.querySelector('#eventSelectionPage').hidden = false;
+  document.body.className = 'theme-wedding';
 }
 function videoEmbedUrl(url) {
   try {
@@ -510,6 +547,7 @@ function renderAttireVideoCollection(sectionSelector, containerSelector) {
 }
 function showSignedInDestination(forceAttire = false) {
   document.querySelector('#signInPage').hidden = true;
+  document.querySelector('#eventSelectionPage').hidden = true;
   const showAttire = viewedEventId === 'wedding' && (!hostAuthenticated || forceAttire);
   document.querySelector('#attirePage').hidden = !showAttire;
   document.querySelector('#eventPage').hidden = showAttire;
@@ -532,7 +570,7 @@ function ensureAccount(callback) {
 function render() {
   const event = EVENT_DETAILS[viewedEventId];
   const isWedding = event.registryOnly === true;
-  const isPreview = hostAuthenticated && viewedEventId !== appState.activeEventId;
+  const isPreview = hostAuthenticated && !activeEventIds().includes(viewedEventId);
   const signedInAccount = document.querySelector('#signedInAccount');
   signedInAccount.hidden = !guestName;
   document.querySelector('#signedInAccountName').textContent = guestName === HOST_DISPLAY_NAME
@@ -542,6 +580,7 @@ function render() {
   document.title = `The Meyers ${event.name}`;
   document.querySelector('meta[name="description"]').content = `The Meyers ${event.name} potluck and RSVP page.`;
   renderSyncStatus();
+  renderEventDock();
   updateHeaderImage(event);
   const eventDate = new Date(`${state.eventDate}T12:00:00`);
   const dateElement = document.querySelector('#eventDate');
@@ -610,6 +649,13 @@ function render() {
   invitedListButton.disabled = !hostAuthenticated;
   invitedListButton.title = hostAuthenticated ? 'View invited families' : 'Invited family details are private to the host';
   invitedListButton.setAttribute('aria-label', hostAuthenticated ? `${invitedAccounts.length} families invited; view private invitation list` : `${invitedAccounts.length} families invited; details visible only to the host`);
+}
+
+function renderEventDock() {
+  const dock = document.querySelector('#eventDock');
+  const ids = availableEventIds();
+  dock.hidden = !guestName || ids.length === 0;
+  dock.innerHTML = ids.map(id => `<button type="button" data-switch-event="${id}" ${id === viewedEventId ? 'aria-current="page"' : ''}><span>${escapeHtml(EVENT_DETAILS[id].name)}</span></button>`).join('');
 }
 function renderDish(item) {
   const mine = guestName && item.claims.includes(guestName);
@@ -690,12 +736,28 @@ document.querySelector('#passwordForm').addEventListener('submit', event => {
   if (!firstName || !lastName) { document.querySelector('#accountPasswordError').textContent = 'Enter your first and last name, plus your suffix if you have one.'; return; }
   const account = appState.accounts.find(entry => accountNameMatches(accountName, entry.name));
   if (!account) { document.querySelector('#accountPasswordError').textContent = 'That name and suffix are not recognized.'; return; }
-  if (!accountCanSignIn(account, viewedEventId)) { document.querySelector('#accountPasswordError').textContent = 'This account is not currently invited.'; return; }
+  if (!activeEventIds().some(id => accountCanSignIn(account, id))) { document.querySelector('#accountPasswordError').textContent = 'This account is not currently invited to an active event.'; return; }
   guestName = account.name;
   document.querySelector('#accountPasswordError').textContent = '';
-  render();
-  showSignedInDestination();
+  showEventSelection();
   const action = pendingAccountAction; pendingAccountAction = null; action?.();
+});
+document.querySelector('#eventSelectionChoices').addEventListener('click', event => {
+  const button = event.target.closest('[data-enter-event]');
+  if (!button) return;
+  viewedEventId = button.dataset.enterEvent;
+  state = appState.events[viewedEventId];
+  render();
+  showSignedInDestination(viewedEventId === 'wedding');
+});
+document.querySelector('#eventDock').addEventListener('click', event => {
+  const button = event.target.closest('[data-switch-event]');
+  if (!button || button.dataset.switchEvent === viewedEventId) return;
+  viewedEventId = button.dataset.switchEvent;
+  state = appState.events[viewedEventId];
+  render();
+  showSignedInDestination(viewedEventId === 'wedding');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 document.querySelector('#hostPasswordToggle').addEventListener('click', () => {
   setHostPasswordMode(document.querySelector('#hostPassword').disabled);
@@ -913,11 +975,12 @@ document.querySelector('#signInSettingsButton').addEventListener('click', () => 
 });
 function openEventsAdmin() {
   document.querySelector('#eventChoices').innerHTML = Object.entries(EVENT_DETAILS).map(([id, event]) => {
-    const active = id === appState.activeEventId;
+    const active = activeEventIds().includes(id);
     const date = new Date(`${appState.events[id].eventDate}T12:00:00`);
     const formatted = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(date).replaceAll(',', '');
     const previewing = id === viewedEventId;
-    return `<div class="event-choice"><div><strong>${event.name}</strong><span>${formatted}${active ? ' · Visible to guests' : ' · Hidden'}</span></div><div class="event-choice-actions"><button class="preview-event" type="button" data-preview-event="${id}" ${previewing ? 'disabled' : ''}>${previewing ? 'Previewing' : 'Preview'}</button><button type="button" data-activate-event="${id}" ${active ? 'disabled' : ''}>${active ? 'Active' : 'Activate'}</button></div></div>`;
+    const lastActive = active && activeEventIds().length === 1;
+    return `<div class="event-choice"><div><strong>${event.name}</strong><span>${formatted}${active ? ' · Active' : ' · Hidden'}</span></div><div class="event-choice-actions"><button class="preview-event" type="button" data-preview-event="${id}" ${previewing ? 'disabled' : ''}>${previewing ? 'Previewing' : 'Preview'}</button><button type="button" data-toggle-event="${id}" class="${active ? 'deactivate-event' : ''}" ${lastActive ? 'disabled title="At least one event must remain active"' : ''}>${active ? 'Deactivate' : 'Activate'}</button></div></div>`;
   }).join('');
   document.querySelectorAll('[data-preview-event]').forEach(button => button.addEventListener('click', () => {
     viewedEventId = button.dataset.previewEvent;
@@ -926,17 +989,17 @@ function openEventsAdmin() {
     document.querySelector('#eventsDialog').close();
     render();
     showSignedInDestination(viewedEventId === 'wedding');
-    showToast(`Previewing ${EVENT_DETAILS[viewedEventId].name}. Guests still see ${EVENT_DETAILS[appState.activeEventId].name}.`);
+    showToast(`Previewing ${EVENT_DETAILS[viewedEventId].name}.`);
   }));
-  document.querySelectorAll('[data-activate-event]').forEach(button => button.addEventListener('click', () => {
+  document.querySelectorAll('[data-toggle-event]').forEach(button => button.addEventListener('click', () => {
     appState.events[viewedEventId] = state;
-    appState.activeEventId = button.dataset.activateEvent;
-    viewedEventId = appState.activeEventId;
-    state = appState.events[viewedEventId];
-    guestName = '';
+    const id = button.dataset.toggleEvent;
+    const ids = activeEventIds();
+    appState.activeEventIds = ids.includes(id) ? ids.filter(eventId => eventId !== id) : [...ids, id];
+    appState.activeEventId = appState.activeEventIds[0] || id;
     saveState();
     openEventsAdmin();
-    showToast(`${EVENT_DETAILS[appState.activeEventId].name} is now live.`);
+    showToast(`${EVENT_DETAILS[id].name} is now ${appState.activeEventIds.includes(id) ? 'active' : 'hidden'}.`);
   }));
   const dialog = document.querySelector('#eventsDialog');
   if (!dialog.open) dialog.showModal();
