@@ -1146,7 +1146,15 @@ async function uploadTemplateBackground(templateId, file) {
   if (!SHARED_STATE_URL) throw new Error('Configure the shared-state Worker before uploading invitation artwork.');
   const metadata = await backgroundMetadata(file);
   const response = await fetchWithTimeout(templateAssetUrl(templateId), { method: 'PUT', headers: { 'Content-Type': file.type, 'X-Host-Password': hostCredential }, body: file });
-  if (!response.ok) throw new Error(await response.text() || `Background upload failed (${response.status}).`);
+  if (!response.ok) {
+    const details = await response.text();
+    if (response.status === 401) throw new Error('The Worker host password does not match this website. Update the HOST_PASSWORD Worker secret.');
+    if (response.status === 404 || response.status === 405 || details === 'Unable to access shared state.') {
+      throw new Error('The invitation upload endpoint is not deployed. Create the R2 bucket, then deploy the latest shared-state Worker.');
+    }
+    if (response.status === 503) throw new Error(details || 'Invitation background storage is unavailable. Verify the Worker R2 bucket binding.');
+    throw new Error(details || `Background upload failed (${response.status}).`);
+  }
   return { ...metadata, url: templateAssetUrl(templateId), updatedAt: new Date().toISOString() };
 }
 function renderTemplateManager() {
