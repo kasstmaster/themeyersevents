@@ -323,6 +323,7 @@
           <button id="editItemsButton" type="button"><strong>Edit menu items</strong><span>Add, change, or remove dishes</span></button>
           <button id="clearClaimButton" type="button"><strong>Clear a claim</strong><span>Remove a dish quantity from a family</span></button>
           <button id="editAccountsButton" type="button"><strong>Manage accounts</strong><span>Choose which families can sign in</span></button>
+          <button id="invitationTemplatesButton" type="button"><strong>Invitation templates</strong><span>Upload artwork and visually place invitation fields</span></button>
         </div>
       </form>
     </dialog>
@@ -363,8 +364,10 @@
             <label><span>RSVP by</span><input id="invitationRsvpDate" type="date" required /></label>
             <label><span>Address line 1</span><input id="invitationAddress1" maxlength="60" required /></label>
             <label><span>Address line 2</span><input id="invitationAddress2" maxlength="60" required /></label>
+            <label><span>Invitation template</span><select id="invitationTemplateAssignment"></select></label>
           </div>
           <p id="invitationOverflowWarning" class="form-error" role="alert"></p>
+          <div class="invitation-actions"><button id="downloadAllInvitations" type="button">Download All Invitations</button></div>
         </section>
         <div id="adminAccounts" class="admin-accounts"></div>
         <div class="account-add">
@@ -380,10 +383,36 @@
       </form>
     </dialog>
 
+    <dialog id="invitationTemplatesDialog" class="wide-dialog template-manager-dialog">
+      <form method="dialog" class="modal-card">
+        <button class="modal-close" value="cancel" aria-label="Close">×</button>
+        <p class="section-kicker">Host dashboard</p><h2>Invitation templates</h2>
+        <p>Background artwork is runtime data stored outside this website repository. PNG, JPEG, and WebP are supported.</p>
+        <div id="invitationTemplateList" class="template-list"></div>
+        <div class="template-create"><input id="newTemplateName" maxlength="80" placeholder="Template name" aria-label="Template name"><input id="newTemplateBackground" type="file" accept="image/png,image/jpeg,image/webp" aria-label="Invitation background"><button id="createTemplateButton" type="button">Create template</button></div>
+        <p id="templateManagerError" class="form-error" role="alert"></p>
+        <button class="primary-button" value="default">Done</button>
+      </form>
+    </dialog>
+
+    <dialog id="invitationEditorDialog" class="template-editor-dialog">
+      <form method="dialog" class="modal-card">
+        <button class="modal-close" value="cancel" aria-label="Close">×</button>
+        <div class="editor-heading"><div><p class="section-kicker">Visual invitation editor</p><h2 id="templateEditorHeading"></h2></div><label>Template name<input id="templateEditorName" maxlength="80"></label><label>Preview account<select id="templatePreviewAccount"></select></label></div>
+        <div class="template-editor-layout">
+          <aside><h3>Fields</h3><div id="templateFieldToolbox" class="field-toolbox"></div><p id="placementHelp" class="invitation-note">Choose a field, then click the invitation to place it.</p><hr><label>Replace background<input id="replaceTemplateBackground" type="file" accept="image/png,image/jpeg,image/webp"></label></aside>
+          <main><div id="templateCanvasViewport" class="template-canvas-viewport"><div id="templateCanvasStage" class="template-canvas-stage"><img id="templateBackgroundPreview" alt="Invitation background"><div id="templateFieldLayer"></div></div></div><p id="templateOverflowWarning" class="form-error" role="alert"></p></main>
+          <aside id="fieldInspector"><h3>Field settings</h3><p>Select a placed field.</p></aside>
+        </div>
+        <p id="templateEditorError" class="form-error" role="alert"></p>
+        <div class="invitation-actions"><button id="saveTemplateButton" type="button">Save template</button><button id="previewEditedTemplateButton" type="button">Preview invitation</button></div>
+      </form>
+    </dialog>
+
     <dialog id="invitationPreviewDialog" class="invitation-preview-dialog">
       <form method="dialog" class="modal-card">
         <button class="modal-close" value="cancel" aria-label="Close">×</button>
-        <p class="section-kicker">Locked invitation preview</p><h2 id="invitationPreviewHeading"></h2>
+        <p class="section-kicker">Invitation preview</p><h2 id="invitationPreviewHeading"></h2>
         <p id="invitationPreviewAccount" class="invitation-note"></p>
         <div class="invitation-canvas-wrap"><canvas id="invitationCanvas" width="720" height="1008" aria-label="Invitation preview"></canvas></div>
         <div class="invitation-actions"><button id="downloadInvitationPng" type="button">Download Invitation</button></div>

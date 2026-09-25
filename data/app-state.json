@@ -177,7 +177,8 @@
       ],
       "rsvpDate": "2026-11-14",
       "addressLine1": "221 W China Grade Loop",
-      "addressLine2": "Bakersfield CA 93308"
+      "addressLine2": "Bakersfield CA 93308",
+      "invitationTemplateId": ""
     },
     "wedding": {
       "eventDate": "2027-08-10",
@@ -199,7 +200,9 @@
       "monetaryGiftUrl": "",
       "rsvpDate": "2027-07-27",
       "addressLine1": "221 W China Grade Loop",
-      "addressLine2": "Bakersfield CA 93308"
+      "addressLine2": "Bakersfield CA 93308",
+      "invitationTemplateId": ""
     }
-  }
+  },
+  "invitationTemplates": []
 }

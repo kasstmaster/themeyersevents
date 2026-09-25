@@ -5,7 +5,7 @@ function corsHeaders(request, env) {
   const allowedOrigin = env.ALLOWED_ORIGIN || '*';
   return {
     'Access-Control-Allow-Origin': allowedOrigin === '*' ? '*' : (origin === allowedOrigin ? origin : allowedOrigin),
-    'Access-Control-Allow-Methods': 'GET, PUT, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, PUT, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, X-Host-Password',
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin'
@@ -49,6 +49,31 @@ function safeEqual(left, right) {
 
 function requireHost(request, env) {
   return env.HOST_PASSWORD && safeEqual((request.headers.get('X-Host-Password') || '').toLowerCase(), env.HOST_PASSWORD.toLowerCase());
+}
+
+const INVITATION_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+function invitationBackgroundKey(pathname) {
+  const match = /^\/invitation-backgrounds\/([a-zA-Z0-9-]+)$/.exec(pathname);
+  return match ? `invitation-backgrounds/${match[1]}` : '';
+}
+async function handleInvitationBackground(request, env, key) {
+  if (!env.INVITATION_BACKGROUNDS) return response(request, env, 'Invitation background storage is not configured.', 503);
+  if (request.method === 'GET') {
+    const object = await env.INVITATION_BACKGROUNDS.get(key);
+    if (!object) return response(request, env, 'Not found.', 404);
+    return response(request, env, object.body, 200, { 'Content-Type': object.httpMetadata?.contentType || 'application/octet-stream', 'Cache-Control': 'public, max-age=3600', 'ETag': object.httpEtag });
+  }
+  if (!requireHost(request, env)) return response(request, env, 'Host authentication failed.', 401);
+  if (request.method === 'PUT') {
+    const contentType = (request.headers.get('Content-Type') || '').split(';')[0].toLowerCase();
+    if (!INVITATION_IMAGE_TYPES.has(contentType)) return response(request, env, 'Only PNG, JPEG, and WebP images are supported.', 415);
+    const size = Number(request.headers.get('Content-Length') || 0);
+    if (size > 15_000_000) return response(request, env, 'Image is too large (15 MB maximum).', 413);
+    await env.INVITATION_BACKGROUNDS.put(key, request.body, { httpMetadata: { contentType }, customMetadata: { uploadedAt: new Date().toISOString() } });
+    return jsonResponse(request, env, { ok: true });
+  }
+  if (request.method === 'DELETE') { await env.INVITATION_BACKGROUNDS.delete(key); return response(request, env, null, 204); }
+  return response(request, env, 'Method not allowed.', 405, { Allow: 'GET, PUT, DELETE, OPTIONS' });
 }
 
 async function dispatchAnyListSync(env, syncId) {
@@ -129,6 +154,8 @@ export default {
     }
     try {
       const url = new URL(request.url);
+      const backgroundKey = invitationBackgroundKey(url.pathname);
+      if (backgroundKey) return handleInvitationBackground(request, env, backgroundKey);
       if (url.pathname === '/anylist-sync' || url.pathname === '/anylist-sync/status') {
         if (!requireHost(request, env)) return jsonResponse(request, env, { error: 'host_authentication_failed' }, 401);
         if (url.pathname === '/anylist-sync' && request.method === 'POST') {

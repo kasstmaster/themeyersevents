@@ -11,3 +11,9 @@ ALLOWED_ORIGIN = "https://kasstmaster.github.io"
 # Repository containing this website and sync-anylist.yml.
 GITHUB_WORKFLOW_REPOSITORY = "kasstmaster/thanksgiving"
 GITHUB_WORKFLOW_BRANCH = "main"
+
+# Create this once with `npx wrangler r2 bucket create meyers-invitation-backgrounds`.
+# Uploaded invitation artwork lives here as runtime data, never in the website repository.
+[[r2_buckets]]
+binding = "INVITATION_BACKGROUNDS"
+bucket_name = "meyers-invitation-backgrounds"
