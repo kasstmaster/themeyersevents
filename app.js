@@ -114,7 +114,6 @@ let pendingAccountAction = null;
 let pendingClaimItemId = null;
 let hostAuthenticated = false;
 let hostCredential = '';
-let hostToolsRequested = false;
 let localStateRevision = 0;
 const singleColumnMenu = window.matchMedia('(max-width: 800px)');
 
@@ -499,7 +498,7 @@ function updateHeaderImage(event) {
   headerImage.addEventListener('error', () => { headerImage.hidden = true; }, { once: true });
   headerImage.src = nextSource;
 }
-function updateHostToolsButton() { document.querySelector('#hostToolsButton').textContent = hostAuthenticated ? 'Host tools' : 'Settings'; }
+function updateHostToolsButton() { document.querySelector('#hostToolsButton').hidden = !hostAuthenticated; }
 function setHostPasswordMode(enabled) {
   const guestFields = document.querySelector('#guestSignInFields');
   const hostFields = document.querySelector('#hostSignInFields');
@@ -509,7 +508,7 @@ function setHostPasswordMode(enabled) {
   document.querySelector('#hostPassword').disabled = !enabled;
   document.querySelector('#signInHeading').textContent = enabled ? 'Enter host password' : "What's your name?";
   document.querySelector('#signInSubmit').textContent = enabled ? 'Sign in as host' : "Let's get started";
-  document.querySelector('#hostPasswordToggle').textContent = enabled ? 'OR SIGN IN WITH YOUR NAME' : 'OR ENTER PASSWORD';
+  document.querySelector('#hostPasswordToggle').textContent = enabled ? 'OR SIGN IN WITH YOUR NAME' : 'HOST SIGN IN';
   document.querySelector('#accountPasswordError').textContent = '';
   (enabled ? document.querySelector('#hostPassword') : document.querySelector('#accountFirstName')).focus();
 }
@@ -570,7 +569,6 @@ function ensureAccount(callback) {
     return callback();
   }
   pendingAccountAction = callback;
-  hostToolsRequested = false;
   showSignInPage();
 }
 
@@ -587,6 +585,7 @@ function render() {
   document.title = `The Meyers ${event.name}`;
   document.querySelector('meta[name="description"]').content = `The Meyers ${event.name} potluck and RSVP page.`;
   renderSyncStatus();
+  updateHostToolsButton();
   renderEventDock();
   updateHeaderImage(event);
   const eventDate = new Date(`${state.eventDate}T12:00:00`);
@@ -728,14 +727,11 @@ document.querySelector('#passwordForm').addEventListener('submit', event => {
     updateHostToolsButton();
     const action = pendingAccountAction;
     pendingAccountAction = null;
-    const shouldOpenHostTools = hostToolsRequested;
-    hostToolsRequested = false;
     showSignedInDestination();
     document.querySelector('#accountPasswordError').textContent = '';
     hostPasswordInput.value = '';
     render();
-    if (shouldOpenHostTools) document.querySelector('#hostToolsDialog').showModal();
-    else if (action) action();
+    if (action) action();
     else showToast('Host sign-in complete. You can RSVP and bring items as The Host.');
     return;
   }
@@ -973,15 +969,6 @@ function renameAccount(index, input) {
 document.querySelector('#hostToolsButton').addEventListener('click', () => {
   pendingAccountAction = null;
   if (hostAuthenticated) document.querySelector('#hostToolsDialog').showModal();
-  else {
-    hostToolsRequested = true;
-    showSignInPage();
-    setHostPasswordMode(true);
-  }
-});
-document.querySelector('#signInSettingsButton').addEventListener('click', () => {
-  hostToolsRequested = true;
-  setHostPasswordMode(true);
 });
 function openEventsAdmin() {
   document.querySelector('#eventChoices').innerHTML = Object.entries(EVENT_DETAILS).map(([id, event]) => {
