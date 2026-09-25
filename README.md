@@ -150,6 +150,23 @@ The two repository settings intentionally differ: the workflow code lives in
 `kasstmaster/thanksgiving`, while both the existing website and the AnyList job
 read and write the live state in `kasstmaster/themeyersevents-data`.
 
+After it reconciles the address book, the job also gives every account missing
+QR access a cryptographically random 256-bit `qrToken`. Existing tokens are
+never replaced, including when AnyList changes an account name or household
+membership. The status shown in **Manage accounts** reports how many accounts
+received QR access, or that every account already had it. Existing installations
+need no separate migration: run **Sync AnyList Address Book** once to backfill
+older accounts.
+
+Hosts can then select **QR** beside an account in **Manage accounts** to preview
+its code and download a transparent PNG or SVG. The QR contains only a GitHub
+Pages-compatible route in the form
+`#/signin/account/<secure-random-token>`—never an account ID or guest name. That
+page still requires the guest's first name, last name, and optional suffix. It
+uses the normal name matcher and session flow, but limits the lookup to the
+current members of the account identified by the token. Invalid account links
+show one generic error.
+
 Then deploy the Worker manually and push the workflow. No deployment is
 performed by this repository change. Sync logs include counts and outcomes but
 never credentials, cookies, authorization headers, or token values.
