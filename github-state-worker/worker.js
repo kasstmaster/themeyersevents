@@ -67,9 +67,16 @@ async function handleInvitationBackground(request, env, key) {
   if (request.method === 'PUT') {
     const contentType = (request.headers.get('Content-Type') || '').split(';')[0].toLowerCase();
     if (!INVITATION_IMAGE_TYPES.has(contentType)) return response(request, env, 'Only PNG, JPEG, and WebP images are supported.', 415);
-    const size = Number(request.headers.get('Content-Length') || 0);
-    if (size > 15_000_000) return response(request, env, 'Image is too large (15 MB maximum).', 413);
-    await env.INVITATION_BACKGROUNDS.put(key, request.body, { httpMetadata: { contentType }, customMetadata: { uploadedAt: new Date().toISOString() } });
+    const declaredSize = Number(request.headers.get('Content-Length') || 0);
+    if (declaredSize > 15_000_000) return response(request, env, 'Image is too large (15 MB maximum).', 413);
+
+    // Browser request bodies are not guaranteed to arrive as fixed-length
+    // streams. R2 rejects streams without a known length, which previously
+    // surfaced to hosts as the generic "Unable to access shared state" error.
+    // Buffering also lets us enforce the limit when Content-Length is omitted.
+    const image = await request.arrayBuffer();
+    if (image.byteLength > 15_000_000) return response(request, env, 'Image is too large (15 MB maximum).', 413);
+    await env.INVITATION_BACKGROUNDS.put(key, image, { httpMetadata: { contentType }, customMetadata: { uploadedAt: new Date().toISOString() } });
     return jsonResponse(request, env, { ok: true });
   }
   if (request.method === 'DELETE') { await env.INVITATION_BACKGROUNDS.delete(key); return response(request, env, null, 204); }
