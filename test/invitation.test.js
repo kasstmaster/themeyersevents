@@ -70,12 +70,14 @@ test('multiple accounts receive distinct existing QR payloads and no printed nam
 
 test('renderer uses uploaded original dimensions', async () => {
   const originalImage = globalThis.Image;
-  globalThis.Image = class { set src(value) { this._src = value; queueMicrotask(() => this.onload()); } };
+  let loadedSource = '';
+  globalThis.Image = class { set src(value) { loadedSource = this._src = value; queueMicrotask(() => this.onload()); } };
   const operations = [], context = { drawImage: (...args) => operations.push(['image', ...args]), save() {}, beginPath() {}, rect() {}, clip() {}, fillText() {}, restore() {}, fillRect() {}, measureText: () => ({ width: 1 }) };
   const canvas = { width: 0, height: 0, getContext: () => context };
   const template = Invitation.createTemplate('Test', background);
   await Invitation.render(canvas, Invitation.invitationModel(template, {}, 'qr'), { getModuleCount: () => 1, isDark: () => false });
   assert.equal(canvas.width, 720); assert.equal(canvas.height, 1008); assert.equal(operations[0][4], 720); assert.equal(operations[0][5], 1008);
+  assert.match(loadedSource, /[?&]v=/, 'background URL is versioned to avoid a stale failed browser request');
   globalThis.Image = originalImage;
 });
 

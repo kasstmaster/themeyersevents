@@ -535,14 +535,19 @@ async function renderInvitation(canvas, account) {
 }
 async function openInvitationPreview(account = invitationAccounts()[0] || null) {
   if (!state.invitationTemplateId) { showToast('Assign an invitation template to this gathering first.'); return; }
-  invitationPreviewAccount = account;
-  document.querySelector('#invitationPreviewHeading').textContent = `${EVENT_DETAILS[viewedEventId].name} invitation`;
-  document.querySelector('#invitationPreviewAccount').textContent = account ? `Previewing the QR for ${account.name}. The account name is not printed.` : 'Previewing an explicit sample QR. No account name is printed.';
-  const canvas = document.querySelector('#invitationCanvas');
-  const model = await renderInvitation(canvas, account);
-  const warnings = window.Invitation.overflowWarnings(canvas, model);
-  document.querySelector('#invitationOverflowWarning').textContent = warnings.length ? `These values exceed their locked safe width: ${warnings.join(', ')}. Shorten them before downloading.` : '';
-  document.querySelector('#invitationPreviewDialog').showModal();
+  try {
+    invitationPreviewAccount = account;
+    document.querySelector('#invitationPreviewHeading').textContent = `${EVENT_DETAILS[viewedEventId].name} invitation`;
+    document.querySelector('#invitationPreviewAccount').textContent = account ? `Previewing the QR for ${account.name}. The account name is not printed.` : 'Previewing an explicit sample QR. No account name is printed.';
+    const canvas = document.querySelector('#invitationCanvas');
+    const model = await renderInvitation(canvas, account);
+    const warnings = window.Invitation.overflowWarnings(canvas, model);
+    document.querySelector('#invitationOverflowWarning').textContent = warnings.length ? `These values exceed their locked safe width: ${warnings.join(', ')}. Shorten them before downloading.` : '';
+    document.querySelector('#invitationPreviewDialog').showModal();
+  } catch (caught) {
+    invitationPreviewAccount = null;
+    document.querySelector('#adminAccountError').textContent = `Unable to preview the invitation. ${caught.message}`;
+  }
 }
 async function downloadInvitation(account) {
   if (!account?.qrToken) return;
@@ -1035,7 +1040,7 @@ function openAccountsAdmin() {
   const sortedAccounts = appState.accounts.map((account, index) => ({ account, index })).sort((left, right) =>
     firstAccountLastName(left.account.name).localeCompare(firstAccountLastName(right.account.name), 'en-US', { sensitivity: 'base' })
     || left.account.name.localeCompare(right.account.name, 'en-US', { sensitivity: 'base' }));
-  document.querySelector('#adminAccounts').innerHTML = sortedAccounts.length ? sortedAccounts.map(({ account, index }) => `<div class="account-row" data-account-index="${index}"><div class="account-access"><label class="account-selection"><input class="account-selected" type="checkbox" ${accountCanSignIn(account, viewedEventId) ? 'checked' : ''} ${account.alwaysInvite ? 'disabled' : ''}><span>Can sign in</span></label><label class="account-selection"><input class="account-always-invite" type="checkbox" ${account.alwaysInvite ? 'checked' : ''}><span>Always Invite</span></label></div><input value="${escapeAttribute(account.name)}" maxlength="120" aria-label="Account name"><div class="account-preview-actions"><button class="account-qr-button" type="button" aria-label="View QR code for ${escapeAttribute(account.name)}">QR</button><button class="account-invitation-button" type="button" aria-label="View invitation for ${escapeAttribute(account.name)}" ${account.qrToken ? '' : 'disabled title="QR access is required"'}>View invitation</button></div><button class="account-delete-button" type="button" aria-label="Delete ${escapeAttribute(account.name)} account">×</button></div>`).join('') : '<p class="guest-empty">No guest accounts yet.</p>';
+  document.querySelector('#adminAccounts').innerHTML = sortedAccounts.length ? sortedAccounts.map(({ account, index }) => `<div class="account-row" data-account-index="${index}"><div class="account-access"><label class="account-selection"><input class="account-selected" type="checkbox" ${accountCanSignIn(account, viewedEventId) ? 'checked' : ''} ${account.alwaysInvite ? 'disabled' : ''}><span>Can sign in</span></label><label class="account-selection"><input class="account-always-invite" type="checkbox" ${account.alwaysInvite ? 'checked' : ''}><span>Always Invite</span></label></div><input value="${escapeAttribute(account.name)}" maxlength="120" aria-label="Account name"><div class="account-preview-actions"><button class="account-qr-button" type="button" aria-label="View QR code for ${escapeAttribute(account.name)}">QR</button><button class="account-invitation-button" type="button" aria-label="View invitation for ${escapeAttribute(account.name)}" ${account.qrToken ? '' : 'disabled title="QR access is required"'}>Inv</button></div><button class="account-delete-button" type="button" aria-label="Delete ${escapeAttribute(account.name)} account">×</button></div>`).join('') : '<p class="guest-empty">No guest accounts yet.</p>';
   document.querySelectorAll('.account-row').forEach(row => {
     const [access, name, previewActions, remove] = row.children;
     const viewQr = previewActions.querySelector('.account-qr-button');
@@ -1208,7 +1213,8 @@ function renderEditorFields() {
     element.addEventListener('pointerdown', event => beginFieldPointer(event, element));
     element.addEventListener('click', event => { event.stopPropagation(); selectedTemplateFieldId = element.dataset.fieldId; renderEditorFields(); renderFieldInspector(); });
   });
-  const overflowing = [...layer.querySelectorAll('.editor-field:not(.qr)')].filter(element => element.scrollWidth > element.clientWidth).map(element => templateDraft.fields.find(field => field.id === element.dataset.fieldId)?.label);
+  const overflowModel = window.Invitation.invitationModel(templateDraft, state, invitationQrUrl(null));
+  const overflowing = window.Invitation.overflowWarnings(document.createElement('canvas'), overflowModel);
   document.querySelector('#templateOverflowWarning').textContent = overflowing.length ? `Text exceeds its field width: ${overflowing.join(', ')}.` : '';
 }
 function beginFieldPointer(event, element) {
