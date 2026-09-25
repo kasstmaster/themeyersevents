@@ -44,11 +44,15 @@ state when the page opens, regains focus, and every 30 seconds.
    `owner/repository`, set `ALLOWED_ORIGIN` to the exact GitHub Pages origin
    (include a repository path only in the Pages URL, not in the origin), and
    change the branch or state path if needed.
-4. From the repository root, run:
+4. Create the invitation artwork bucket, then deploy the Worker from the
+   repository root. Worker source changes are not deployed by GitHub Pages, so
+   rerun the deploy command after pulling Worker updates:
 
    ```sh
+   npx wrangler r2 bucket create meyers-invitation-backgrounds
    cd github-state-worker
    npx wrangler secret put GITHUB_TOKEN
+   npx wrangler secret put HOST_PASSWORD
    npx wrangler deploy
    ```
 
@@ -69,9 +73,8 @@ you copy them into the file and commit it.
 Invitation template metadata and field coordinates use that shared JSON state.
 Uploaded PNG, JPEG, and WebP backgrounds are deliberately not put in either Git
 repository: the Worker stores their bytes in its `INVITATION_BACKGROUNDS` R2
-bucket. Before deploying, create it with
-`npx wrangler r2 bucket create meyers-invitation-backgrounds` (or change the
-binding's bucket name in `wrangler.toml`). The browser saves only the runtime
+bucket. If you use a different bucket name, change the binding in
+`wrangler.toml` before deploying. The browser saves only the runtime
 background URL, media type, and original pixel dimensions in template records.
 
 If GitHub or the worker is temporarily unavailable, the change remains in that
