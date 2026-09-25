@@ -74,7 +74,12 @@ function christmasItems() {
     { id: 'mulled-wine', name: 'Mulled Wine', category: 'Drinks', needed: 1, claims: [] }
   ];
 }
-function makeEvent(items, eventDate, menuVersion) { return { items, rsvps: [], eventDate, accountSelectionResetFor: '', menuVersion, quantityUnits: structuredClone(DEFAULT_QUANTITY_UNITS) }; }
+function defaultInvitationSettings(eventDate) {
+  const event = new Date(`${eventDate}T12:00:00Z`);
+  event.setUTCDate(event.getUTCDate() - 14);
+  return { rsvpDate: event.toISOString().slice(0, 10), addressLine1: '221 W China Grade Loop', addressLine2: 'Bakersfield CA 93308' };
+}
+function makeEvent(items, eventDate, menuVersion) { return { items, rsvps: [], eventDate, ...defaultInvitationSettings(eventDate), accountSelectionResetFor: '', menuVersion, quantityUnits: structuredClone(DEFAULT_QUANTITY_UNITS) }; }
 function initialAppState() {
   return {
     activeEventId: 'thanksgiving',
@@ -116,6 +121,7 @@ let hostAuthenticated = false;
 let hostCredential = '';
 let qrScopedAccount = null;
 let qrAdminAccount = null;
+let invitationPreviewAccount = null;
 let localStateRevision = 0;
 const singleColumnMenu = window.matchMedia('(max-width: 800px)');
 
@@ -180,6 +186,10 @@ function normalizeState(saved) {
             children: Math.max(0, Number(rsvp.children) || 0)
           })) : [];
         eventState.eventDate = typeof eventState.eventDate === 'string' ? eventState.eventDate : fallback.eventDate;
+        const invitationFallback = defaultInvitationSettings(eventState.eventDate);
+        eventState.rsvpDate = typeof eventState.rsvpDate === 'string' ? eventState.rsvpDate : invitationFallback.rsvpDate;
+        eventState.addressLine1 = typeof eventState.addressLine1 === 'string' ? eventState.addressLine1 : invitationFallback.addressLine1;
+        eventState.addressLine2 = typeof eventState.addressLine2 === 'string' ? eventState.addressLine2 : invitationFallback.addressLine2;
         eventState.quantityUnits = Array.isArray(eventState.quantityUnits) && eventState.quantityUnits.length
           ? eventState.quantityUnits.filter(unit => unit && typeof unit.id === 'string' && typeof unit.label === 'string')
           : structuredClone(DEFAULT_QUANTITY_UNITS);
@@ -503,6 +513,71 @@ function downloadQrPng(account) {
     if (code.isDark(row, column)) context.fillRect((column + quietZone) * moduleSize, (row + quietZone) * moduleSize, moduleSize, moduleSize);
   }
   canvas.toBlob(blob => { if (blob) downloadBlob(blob, `${safeQrFilename(account.name)}.png`); }, 'image/png');
+}
+
+function invitationAccounts() {
+  return appState.accounts.filter(account => accountCanSignIn(account, viewedEventId) && account.qrToken)
+    .sort((left, right) => left.name.localeCompare(right.name, 'en-US', { sensitivity: 'base' }));
+}
+function invitationQrUrl(account) {
+  return account?.qrToken ? accountQrUrl(account) : `${window.location.origin}${window.location.pathname}#/signin/sample-preview`;
+}
+function canvasBlob(canvas) { return new Promise(resolve => canvas.toBlob(resolve, 'image/png')); }
+async function renderInvitation(canvas, account) {
+  const model = window.Invitation.invitationModel(viewedEventId, state, invitationQrUrl(account));
+  await window.Invitation.render(canvas, model, makeQrCode(model.qrUrl));
+  return model;
+}
+async function openInvitationPreview(account = invitationAccounts()[0] || null) {
+  invitationPreviewAccount = account;
+  document.querySelector('#invitationPreviewHeading').textContent = `${EVENT_DETAILS[viewedEventId].name} invitation`;
+  document.querySelector('#invitationPreviewAccount').textContent = account ? `Previewing the QR for ${account.name}. The account name is not printed.` : 'Previewing an explicit sample QR. No account name is printed.';
+  const canvas = document.querySelector('#invitationCanvas');
+  const model = await renderInvitation(canvas, account);
+  const warnings = window.Invitation.overflowWarnings(canvas, model);
+  document.querySelector('#invitationOverflowWarning').textContent = warnings.length ? `These values exceed their locked safe width: ${warnings.join(', ')}. Shorten them before downloading.` : '';
+  document.querySelector('#invitationPreviewDialog').showModal();
+}
+async function downloadInvitation(account) {
+  if (!account?.qrToken) return;
+  const canvas = document.createElement('canvas');
+  await renderInvitation(canvas, account);
+  const blob = await canvasBlob(canvas);
+  if (blob) downloadBlob(blob, window.Invitation.filenameFor(account.name, EVENT_DETAILS[viewedEventId].name));
+}
+function crc32(bytes) {
+  let crc = -1;
+  for (const byte of bytes) { crc ^= byte; for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0); }
+  return (crc ^ -1) >>> 0;
+}
+function zipStored(entries) {
+  const encoder = new TextEncoder(), chunks = [], central = []; let offset = 0;
+  const u16 = value => new Uint8Array([value & 255, value >>> 8 & 255]);
+  const u32 = value => new Uint8Array([value & 255, value >>> 8 & 255, value >>> 16 & 255, value >>> 24 & 255]);
+  const join = arrays => { const size = arrays.reduce((sum, array) => sum + array.length, 0), out = new Uint8Array(size); let at = 0; arrays.forEach(array => { out.set(array, at); at += array.length; }); return out; };
+  entries.forEach(entry => {
+    const name = encoder.encode(entry.name), data = entry.data, crc = crc32(data);
+    const local = join([u32(0x04034b50), u16(20), u16(0), u16(0), u16(0), u16(0), u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0), name, data]);
+    chunks.push(local);
+    central.push(join([u32(0x02014b50), u16(20), u16(20), u16(0), u16(0), u16(0), u16(0), u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset), name]));
+    offset += local.length;
+  });
+  const centralSize = central.reduce((sum, chunk) => sum + chunk.length, 0);
+  return new Blob([...chunks, ...central, join([u32(0x06054b50), u16(0), u16(0), u16(entries.length), u16(entries.length), u32(centralSize), u32(offset), u16(0)])], { type: 'application/zip' });
+}
+async function downloadAllInvitations() {
+  const accounts = invitationAccounts();
+  if (!accounts.length) { showToast('No invited accounts have QR access.'); return; }
+  const button = document.querySelector('#downloadAllInvitationsButton'); button.disabled = true; button.textContent = 'Preparing ZIP…';
+  try {
+    const entries = [];
+    for (const account of accounts) {
+      const canvas = document.createElement('canvas'); await renderInvitation(canvas, account);
+      const blob = await canvasBlob(canvas);
+      entries.push({ name: window.Invitation.filenameFor(account.name, EVENT_DETAILS[viewedEventId].name), data: new Uint8Array(await blob.arrayBuffer()) });
+    }
+    downloadBlob(zipStored(entries), `${EVENT_DETAILS[viewedEventId].name}-Invitations.zip`);
+  } finally { button.disabled = false; button.textContent = 'Download all invitations'; }
 }
 function showToast(message) { const toast = document.querySelector('#toast'); toast.textContent = message; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2600); }
 function menuItemSummary(item) {
@@ -1054,6 +1129,38 @@ document.querySelector('#hostToolsButton').addEventListener('click', () => {
   pendingAccountAction = null;
   if (hostAuthenticated) document.querySelector('#hostToolsDialog').showModal();
 });
+function openInvitationAdmin() {
+  const invited = invitationAccounts();
+  document.querySelector('#invitationAdminHeading').textContent = `${EVENT_DETAILS[viewedEventId].name} invitation`;
+  document.querySelector('#invitationEventDate').value = state.eventDate;
+  document.querySelector('#invitationRsvpDate').value = state.rsvpDate || window.Invitation.settings(state).rsvpDate;
+  document.querySelector('#invitationAddress1').value = state.addressLine1 || window.Invitation.DEFAULTS.addressLine1;
+  document.querySelector('#invitationAddress2').value = state.addressLine2 || window.Invitation.DEFAULTS.addressLine2;
+  document.querySelector('#invitationSampleNote').textContent = invited.length ? `Preview defaults to ${invited[0].name}'s real QR. Account names are shown only in this admin list.` : 'No invited account currently has QR access; preview uses a clearly identified sample QR.';
+  document.querySelector('#invitationAccounts').innerHTML = invited.length ? invited.map(account => {
+    const index = appState.accounts.indexOf(account);
+    return `<div class="invitation-account-row" data-account-index="${index}"><strong>${escapeHtml(account.name)}</strong><span><button type="button" data-view-invitation>View invitation</button><button type="button" data-download-invitation>Download invitation</button></span></div>`;
+  }).join('') : '<p class="guest-empty">No invited accounts with QR access.</p>';
+  document.querySelectorAll('.invitation-account-row').forEach(row => {
+    const account = appState.accounts[Number(row.dataset.accountIndex)];
+    row.querySelector('[data-view-invitation]').addEventListener('click', () => openInvitationPreview(account));
+    row.querySelector('[data-download-invitation]').addEventListener('click', () => downloadInvitation(account));
+  });
+  const dialog = document.querySelector('#invitationAdminDialog'); if (!dialog.open) dialog.showModal();
+}
+document.querySelector('#manageInvitationsButton').addEventListener('click', () => { document.querySelector('#hostToolsDialog').close(); openInvitationAdmin(); });
+[['invitationEventDate', 'eventDate'], ['invitationRsvpDate', 'rsvpDate'], ['invitationAddress1', 'addressLine1'], ['invitationAddress2', 'addressLine2']].forEach(([id, key]) => {
+  document.querySelector(`#${id}`).addEventListener('change', event => {
+    const value = event.target.value.trim(); if (!value) return;
+    state[key] = value; saveState(); openInvitationAdmin(); showToast('Invitation setting updated.');
+  });
+});
+document.querySelector('#previewInvitationButton').addEventListener('click', () => openInvitationPreview());
+document.querySelector('#downloadInvitationPng').addEventListener('click', async () => {
+  if (invitationPreviewAccount) await downloadInvitation(invitationPreviewAccount);
+  else showToast('Choose an invited account to download its invitation.');
+});
+document.querySelector('#downloadAllInvitationsButton').addEventListener('click', downloadAllInvitations);
 function openEventsAdmin() {
   document.querySelector('#eventChoices').innerHTML = Object.entries(EVENT_DETAILS).map(([id, event]) => {
     const active = activeEventIds().includes(id);
@@ -1061,7 +1168,7 @@ function openEventsAdmin() {
     const formatted = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(date).replaceAll(',', '');
     const previewing = id === viewedEventId;
     const lastActive = active && activeEventIds().length === 1;
-    return `<div class="event-choice"><div><strong>${event.name}</strong><span>${formatted}${active ? ' · Active' : ' · Hidden'}</span></div><div class="event-choice-actions"><button class="preview-event" type="button" data-preview-event="${id}" ${previewing ? 'disabled' : ''}>${previewing ? 'Previewing' : 'Preview'}</button><button type="button" data-toggle-event="${id}" class="${active ? 'deactivate-event' : ''}" ${lastActive ? 'disabled title="At least one event must remain active"' : ''}>${active ? 'Deactivate' : 'Activate'}</button></div></div>`;
+    return `<div class="event-choice"><div><strong>${event.name}</strong><span>${formatted}${active ? ' · Active' : ' · Hidden'}</span></div><div class="event-choice-actions"><button class="preview-event" type="button" data-preview-event="${id}" ${previewing ? 'disabled' : ''}>${previewing ? 'Previewing' : 'Preview'}</button><button class="invitation-event" type="button" data-invitation-event="${id}">Invitation</button><button type="button" data-toggle-event="${id}" class="${active ? 'deactivate-event' : ''}" ${lastActive ? 'disabled title="At least one event must remain active"' : ''}>${active ? 'Deactivate' : 'Activate'}</button></div></div>`;
   }).join('');
   document.querySelectorAll('[data-preview-event]').forEach(button => button.addEventListener('click', () => {
     viewedEventId = button.dataset.previewEvent;
@@ -1081,6 +1188,10 @@ function openEventsAdmin() {
     saveState();
     openEventsAdmin();
     showToast(`${EVENT_DETAILS[id].name} is now ${appState.activeEventIds.includes(id) ? 'active' : 'hidden'}.`);
+  }));
+  document.querySelectorAll('[data-invitation-event]').forEach(button => button.addEventListener('click', () => {
+    viewedEventId = button.dataset.invitationEvent; state = appState.events[viewedEventId];
+    document.querySelector('#eventsDialog').close(); openInvitationAdmin();
   }));
   const dialog = document.querySelector('#eventsDialog');
   if (!dialog.open) dialog.showModal();
