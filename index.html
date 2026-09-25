@@ -16,7 +16,6 @@
   <body>
     <section id="signInPage" class="sign-in-page theme-wedding" aria-labelledby="signInHeading">
       <header class="site-header sign-in-header">
-        <button class="host-tools-button sign-in-settings" id="signInSettingsButton" type="button">Settings</button>
         <div class="header-art">
           <img src="https://i.ibb.co/KjtXKDRn/Wedding-Header-Website-No-Border.png" alt="Kassandra and Steven wedding" decoding="async" fetchpriority="high" />
         </div>
@@ -36,7 +35,7 @@
           </div>
           <p class="form-error" id="accountPasswordError" role="alert"></p>
           <button class="primary-button" id="signInSubmit" type="submit">Let's get started</button>
-          <button class="alternate-sign-in" id="hostPasswordToggle" type="button">OR ENTER PASSWORD</button>
+          <button class="alternate-sign-in" id="hostPasswordToggle" type="button">HOST SIGN IN</button>
         </form>
       </div>
     </section>
@@ -101,7 +100,7 @@
     <div id="eventPage" hidden>
     <header class="site-header">
       <div class="wedding-sparkles" aria-hidden="true"></div>
-      <button class="host-tools-button" id="hostToolsButton" type="button" aria-haspopup="dialog">Settings</button>
+      <button class="host-tools-button" id="hostToolsButton" type="button" aria-haspopup="dialog" hidden>Host tools</button>
       <div class="header-art">
         <img id="eventHeaderImage" alt="" decoding="async" fetchpriority="high" hidden />
         <time id="eventDate" class="event-date"></time>
