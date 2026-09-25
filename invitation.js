@@ -95,8 +95,12 @@
     const safe = `${accountName}-${eventName}-Invitation`.normalize('NFKD').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '');
     return `${safe || 'Invitation'}.png`;
   }
-  function loadImage(src) {
-    return new Promise((resolve, reject) => { const image = new Image(); image.onload = () => resolve(image); image.onerror = () => reject(new Error('Unable to load invitation background.')); image.crossOrigin = 'anonymous'; image.src = src; });
+  function versionedImageUrl(src, version) {
+    if (!version) return src;
+    return `${src}${src.includes('?') ? '&' : '?'}v=${encodeURIComponent(version)}`;
+  }
+  function loadImage(src, version) {
+    return new Promise((resolve, reject) => { const image = new Image(); image.onload = () => resolve(image); image.onerror = () => reject(new Error('Unable to load invitation background.')); image.crossOrigin = 'anonymous'; image.src = versionedImageUrl(src, version); });
   }
   function drawText(ctx, text, field) {
     ctx.save(); ctx.beginPath(); ctx.rect(field.x, field.y, field.width, field.height); ctx.clip();
@@ -116,7 +120,7 @@
   async function render(canvas, model, qr) {
     const { template } = model, ctx = canvas.getContext('2d');
     canvas.width = template.background.width; canvas.height = template.background.height;
-    ctx.drawImage(await loadImage(template.background.url), 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(await loadImage(template.background.url, template.background.updatedAt || template.updatedAt), 0, 0, canvas.width, canvas.height);
     template.fields.forEach(field => field.type === 'qr' ? drawQr(ctx, qr, field) : drawText(ctx, model.values[field.id], field));
     return canvas;
   }
