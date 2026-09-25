@@ -25,6 +25,7 @@
           <p class="section-kicker">Welcome</p>
           <h1 id="signInHeading">What's your name?</h1>
           <p class="sign-in-intro">Sign in to view the current Meyers gathering.</p>
+          <p id="accountLinkError" class="form-error invalid-sign-in-link" role="alert" hidden>This sign-in link is not valid.</p>
           <div class="name-fields" id="guestSignInFields">
             <label><span>First name</span><input id="accountFirstName" type="text" autocomplete="given-name" required /></label>
             <label><span>Last name</span><input id="accountLastName" type="text" autocomplete="family-name" /></label>
@@ -209,6 +210,21 @@
       </form>
     </dialog>
 
+    <dialog id="qrCodeDialog" class="qr-code-dialog">
+      <form method="dialog" class="modal-card">
+        <button class="modal-close" value="cancel" aria-label="Close">×</button>
+        <p class="section-kicker">Account QR sign-in</p>
+        <h2 id="qrAccountName"></h2>
+        <div id="qrCodePreview" class="qr-code-preview" aria-label="Account QR code"></div>
+        <p id="qrCodeUnavailable" class="form-error" hidden>Run Sync AnyList Address Book to create QR access for this account.</p>
+        <div class="qr-download-actions">
+          <button id="downloadQrPng" type="button">Download PNG</button>
+          <button id="downloadQrSvg" type="button">Download SVG</button>
+        </div>
+        <button class="primary-button" value="default">Done</button>
+      </form>
+    </dialog>
+
     <dialog id="guestListDialog">
       <form method="dialog" class="modal-card">
         <button class="modal-close" value="cancel" aria-label="Close">×</button>
@@ -351,6 +367,7 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </div>
+    <script src="vendor/qrcode.js" defer></script>
     <script src="app.js" defer></script>
   </body>
 </html>

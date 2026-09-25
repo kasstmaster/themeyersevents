@@ -1,5 +1,6 @@
 import AnyListModule from 'anylist';
 import { categoriesFromRawUserData, convertCategory, syncAnyListAccounts } from './anylist-accounts.js';
+import { ensureAccountQrAccess } from './qr-access.js';
 
 const required = name => { if (!process.env[name]) throw new Error(`${name} is not configured.`); return process.env[name]; };
 const ownerRepo = required('STATE_REPOSITORY').split('/');
@@ -71,17 +72,22 @@ async function run() {
     console.log(`Category “${category.name}” account: ${converted.account ?? '(none)'}`);
   }
   console.log(`${accounts.length} accounts converted; ${skipped} ambiguous/empty entries skipped.`);
-  let outcome = { added: [], updated: [] };
+  let outcome = { added: [], updated: [], skipped: [] };
+  let qrAccessCreated = 0;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const current = await getFile(statePath);
     const state = current.value;
     if (!Array.isArray(state.accounts)) throw new Error('Current state has no accounts array.');
     outcome = syncAnyListAccounts(state, accounts);
     console.log(`${outcome.updated.length} account(s) updated; ${outcome.added.length} added; ${outcome.skipped.length} ambiguous account(s) skipped.`);
+    qrAccessCreated = ensureAccountQrAccess(state.accounts);
+    console.log(qrAccessCreated
+      ? `Created QR access for ${qrAccessCreated} account(s).`
+      : 'All accounts already have QR access.');
     try { await putFile(statePath, state, `Sync ${accounts.length} account(s) from AnyList`, current.sha); console.log('Account state saved successfully.'); break; }
     catch (error) { if (!error.message.includes('(409)') || attempt === 2) throw error; console.log('State changed concurrently; retrying against the latest SHA.'); }
   }
-  await writeStatus({ state: 'complete', added: outcome.added.length, updated: outcome.updated.length, skipped: skipped + outcome.skipped.length, finishedAt: new Date().toISOString() });
+  await writeStatus({ state: 'complete', added: outcome.added.length, updated: outcome.updated.length, skipped: skipped + outcome.skipped.length, qrAccessCreated, finishedAt: new Date().toISOString() });
 }
 
 run().catch(async error => {

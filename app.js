@@ -114,6 +114,8 @@ let pendingAccountAction = null;
 let pendingClaimItemId = null;
 let hostAuthenticated = false;
 let hostCredential = '';
+let qrScopedAccount = null;
+let qrAdminAccount = null;
 let localStateRevision = 0;
 const singleColumnMenu = window.matchMedia('(max-width: 800px)');
 
@@ -439,6 +441,69 @@ function findAccount(name) {
   return appState.accounts.find(account => normalizeAccountName(account.name) === normalizedName)
     || appState.accounts.find(account => accountNameMatches(name, account.name));
 }
+function accountQrTokenFromLocation() {
+  const match = window.location.hash.match(/^#\/signin\/account\/([A-Za-z0-9_-]+)$/);
+  return match?.[1] || null;
+}
+function isAccountQrRoute() { return window.location.hash.startsWith('#/signin/account/'); }
+function accountForSignIn(name) {
+  return qrScopedAccount
+    ? (accountNameMatches(name, qrScopedAccount.name) ? qrScopedAccount : null)
+    : findAccount(name);
+}
+function accountQrUrl(account) {
+  const base = `${window.location.origin}${window.location.pathname}`;
+  return `${base}#/signin/account/${account.qrToken}`;
+}
+function safeQrFilename(name) {
+  const filename = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return `${filename || 'account'}-qr`;
+}
+function makeQrCode(url) {
+  const code = new window.QRCode(0, 1);
+  code.addData(url);
+  code.make();
+  return code;
+}
+function qrSvg(code) {
+  const quietZone = 4;
+  const count = code.getModuleCount();
+  const size = count + quietZone * 2;
+  const modules = [];
+  for (let row = 0; row < count; row += 1) {
+    for (let column = 0; column < count; column += 1) {
+      if (code.isDark(row, column)) modules.push(`<rect x="${column + quietZone}" y="${row + quietZone}" width="1" height="1"/>`);
+    }
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges" role="img" aria-label="Account sign-in QR code"><g fill="#111">${modules.join('')}</g></svg>`;
+}
+function downloadBlob(blob, filename) {
+  const anchor = document.createElement('a');
+  anchor.href = URL.createObjectURL(blob);
+  anchor.download = filename;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(anchor.href), 1000);
+}
+function downloadQrSvg(account) {
+  const svg = qrSvg(makeQrCode(accountQrUrl(account)));
+  downloadBlob(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }), `${safeQrFilename(account.name)}.svg`);
+}
+function downloadQrPng(account) {
+  const code = makeQrCode(accountQrUrl(account));
+  const quietZone = 4;
+  const moduleSize = 12;
+  const count = code.getModuleCount();
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = (count + quietZone * 2) * moduleSize;
+  const context = canvas.getContext('2d');
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = '#111111';
+  for (let row = 0; row < count; row += 1) for (let column = 0; column < count; column += 1) {
+    if (code.isDark(row, column)) context.fillRect((column + quietZone) * moduleSize, (row + quietZone) * moduleSize, moduleSize, moduleSize);
+  }
+  canvas.toBlob(blob => { if (blob) downloadBlob(blob, `${safeQrFilename(account.name)}.png`); }, 'image/png');
+}
 function showToast(message) { const toast = document.querySelector('#toast'); toast.textContent = message; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2600); }
 function menuItemSummary(item) {
   const claimCounts = item.claims.reduce((counts, name) => counts.set(name, (counts.get(name) || 0) + 1), new Map());
@@ -740,7 +805,7 @@ document.querySelector('#passwordForm').addEventListener('submit', event => {
   const suffix = document.querySelector('#accountSuffix').value.trim();
   const accountName = [firstName, lastName, suffix].filter(Boolean).join(' ');
   if (!firstName || !lastName) { document.querySelector('#accountPasswordError').textContent = 'Enter your first and last name, plus your suffix if you have one.'; return; }
-  const account = findAccount(accountName);
+  const account = accountForSignIn(accountName);
   if (!account) { document.querySelector('#accountPasswordError').textContent = 'That name and suffix are not recognized.'; return; }
   if (!activeEventIds().some(id => accountCanSignIn(account, id))) { document.querySelector('#accountPasswordError').textContent = 'No active events'; return; }
   guestName = account.name;
@@ -916,9 +981,9 @@ function openAccountsAdmin() {
   const sortedAccounts = appState.accounts.map((account, index) => ({ account, index })).sort((left, right) =>
     firstAccountLastName(left.account.name).localeCompare(firstAccountLastName(right.account.name), 'en-US', { sensitivity: 'base' })
     || left.account.name.localeCompare(right.account.name, 'en-US', { sensitivity: 'base' }));
-  document.querySelector('#adminAccounts').innerHTML = sortedAccounts.length ? sortedAccounts.map(({ account, index }) => `<div class="account-row" data-account-index="${index}"><div class="account-access"><label class="account-selection"><input class="account-selected" type="checkbox" ${accountCanSignIn(account, viewedEventId) ? 'checked' : ''} ${account.alwaysInvite ? 'disabled' : ''}><span>Can sign in</span></label><label class="account-selection"><input class="account-always-invite" type="checkbox" ${account.alwaysInvite ? 'checked' : ''}><span>Always Invite</span></label></div><input value="${escapeAttribute(account.name)}" maxlength="120" aria-label="Account name"><button type="button" aria-label="Delete ${escapeAttribute(account.name)} account">×</button></div>`).join('') : '<p class="guest-empty">No guest accounts yet.</p>';
+  document.querySelector('#adminAccounts').innerHTML = sortedAccounts.length ? sortedAccounts.map(({ account, index }) => `<div class="account-row" data-account-index="${index}"><div class="account-access"><label class="account-selection"><input class="account-selected" type="checkbox" ${accountCanSignIn(account, viewedEventId) ? 'checked' : ''} ${account.alwaysInvite ? 'disabled' : ''}><span>Can sign in</span></label><label class="account-selection"><input class="account-always-invite" type="checkbox" ${account.alwaysInvite ? 'checked' : ''}><span>Always Invite</span></label></div><input value="${escapeAttribute(account.name)}" maxlength="120" aria-label="Account name"><button class="account-qr-button" type="button" aria-label="View QR code for ${escapeAttribute(account.name)}">QR</button><button class="account-delete-button" type="button" aria-label="Delete ${escapeAttribute(account.name)} account">×</button></div>`).join('') : '<p class="guest-empty">No guest accounts yet.</p>';
   document.querySelectorAll('.account-row').forEach(row => {
-    const [access, name, remove] = row.children;
+    const [access, name, viewQr, remove] = row.children;
     access.querySelector('.account-selected').addEventListener('change', event => {
       const account = appState.accounts[Number(row.dataset.accountIndex)];
       account.selectedEvents ??= {};
@@ -936,6 +1001,7 @@ function openAccountsAdmin() {
       openAccountsAdmin();
     });
     name.addEventListener('change', () => renameAccount(Number(row.dataset.accountIndex), name));
+    viewQr.addEventListener('click', () => openQrCode(appState.accounts[Number(row.dataset.accountIndex)]));
     remove.addEventListener('click', () => {
       const [removed] = appState.accounts.splice(Number(row.dataset.accountIndex), 1);
       Object.values(appState.events).forEach(eventState => {
@@ -948,6 +1014,19 @@ function openAccountsAdmin() {
   });
   const dialog = document.querySelector('#accountsDialog'); if (!dialog.open) dialog.showModal();
 }
+function openQrCode(account) {
+  qrAdminAccount = account;
+  document.querySelector('#qrAccountName').textContent = account.name;
+  const preview = document.querySelector('#qrCodePreview');
+  const unavailable = document.querySelector('#qrCodeUnavailable');
+  const buttons = [document.querySelector('#downloadQrPng'), document.querySelector('#downloadQrSvg')];
+  preview.innerHTML = account.qrToken ? qrSvg(makeQrCode(accountQrUrl(account))) : '';
+  unavailable.hidden = Boolean(account.qrToken);
+  buttons.forEach(button => { button.disabled = !account.qrToken; });
+  document.querySelector('#qrCodeDialog').showModal();
+}
+document.querySelector('#downloadQrPng').addEventListener('click', () => { if (qrAdminAccount?.qrToken) downloadQrPng(qrAdminAccount); });
+document.querySelector('#downloadQrSvg').addEventListener('click', () => { if (qrAdminAccount?.qrToken) downloadQrSvg(qrAdminAccount); });
 function renameAccount(index, input) {
   const oldName = appState.accounts[index]?.name;
   const newName = input.value.trim();
@@ -1081,7 +1160,10 @@ document.querySelector('#syncAnyListButton').addEventListener('click', async eve
     await loadSharedState();
     const added = outcome.added ? `${outcome.added} new account${outcome.added === 1 ? '' : 's'} added` : 'no new accounts found';
     const skipped = outcome.skipped ? `, ${outcome.skipped} entr${outcome.skipped === 1 ? 'y' : 'ies'} skipped` : '';
-    result.textContent = `Sync complete — ${added}${skipped}.`;
+    const qrResult = outcome.qrAccessCreated
+      ? ` Created QR access for ${outcome.qrAccessCreated} account${outcome.qrAccessCreated === 1 ? '' : 's'}.`
+      : ' All accounts already have QR access.';
+    result.textContent = `Sync complete — ${added}${skipped}.${qrResult}`;
   } catch (error) {
     console.error(error);
     result.textContent = error.displayMessage || (error instanceof TypeError
@@ -1168,6 +1250,20 @@ async function startApp() {
   // Wait for a configured shared copy before allowing sign-in. Without one,
   // retain the richest recoverable browser copy instead of replacing it.
   await loadSharedState();
+  const qrToken = accountQrTokenFromLocation();
+  if (isAccountQrRoute()) {
+    qrScopedAccount = appState.accounts.find(account => account.qrToken === qrToken) || null;
+    document.querySelector('#hostPasswordToggle').hidden = true;
+    if (!qrScopedAccount) {
+      document.querySelector('#accountLinkError').hidden = false;
+      document.querySelector('#guestSignInFields').hidden = true;
+      document.querySelector('#guestSignInFields').querySelectorAll('input').forEach(input => { input.disabled = true; });
+      document.querySelector('#signInSubmit').hidden = true;
+      document.querySelector('.sign-in-intro').hidden = true;
+    } else {
+      document.querySelector('.sign-in-intro').textContent = 'Enter your name to continue. This link only accepts members of its assigned account.';
+    }
+  }
   render();
   showSignInPage();
 }
