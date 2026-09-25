@@ -389,7 +389,7 @@
         <p class="section-kicker">Host dashboard</p><h2>Invitation templates</h2>
         <p>Background artwork is runtime data stored outside this website repository. PNG, JPEG, and WebP are supported.</p>
         <div id="invitationTemplateList" class="template-list"></div>
-        <div class="template-create"><input id="newTemplateName" maxlength="80" placeholder="Template name" aria-label="Template name"><input id="newTemplateBackground" type="file" accept="image/png,image/jpeg,image/webp" aria-label="Invitation background"><button id="createTemplateButton" type="button">Create template</button></div>
+        <div class="template-create"><input id="newTemplateName" maxlength="80" placeholder="Template name" aria-label="Template name"><label class="template-dropzone" id="newTemplateDropzone"><input id="newTemplateBackground" type="file" accept="image/png,image/jpeg,image/webp"><span><strong>Drop artwork here</strong> or choose a file</span><small>PNG, JPEG, or WebP</small></label><button id="createTemplateButton" type="button">Create template</button></div>
         <p id="templateManagerError" class="form-error" role="alert"></p>
         <button class="primary-button" value="default">Done</button>
       </form>
@@ -400,7 +400,7 @@
         <button class="modal-close" value="cancel" aria-label="Close">×</button>
         <div class="editor-heading"><div><p class="section-kicker">Visual invitation editor</p><h2 id="templateEditorHeading"></h2></div><label>Template name<input id="templateEditorName" maxlength="80"></label><label>Preview account<select id="templatePreviewAccount"></select></label></div>
         <div class="template-editor-layout">
-          <aside><h3>Fields</h3><div id="templateFieldToolbox" class="field-toolbox"></div><p id="placementHelp" class="invitation-note">Choose a field, then click the invitation to place it.</p><hr><label>Replace background<input id="replaceTemplateBackground" type="file" accept="image/png,image/jpeg,image/webp"></label></aside>
+          <aside><h3>Fields</h3><div id="templateFieldToolbox" class="field-toolbox"></div><p id="placementHelp" class="invitation-note">Choose a field, then click the invitation to place it.</p><hr><span class="input-label">Replace background</span><label class="template-dropzone compact" id="replaceTemplateDropzone"><input id="replaceTemplateBackground" type="file" accept="image/png,image/jpeg,image/webp"><span><strong>Drop artwork here</strong> or choose a file</span><small>PNG, JPEG, or WebP</small></label></aside>
           <main><div id="templateCanvasViewport" class="template-canvas-viewport"><div id="templateCanvasStage" class="template-canvas-stage"><img id="templateBackgroundPreview" alt="Invitation background"><div id="templateFieldLayer"></div></div></div><p id="templateOverflowWarning" class="form-error" role="alert"></p></main>
           <aside id="fieldInspector"><h3>Field settings</h3><p>Select a placed field.</p></aside>
         </div>
