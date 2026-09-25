@@ -162,7 +162,14 @@ export default {
     try {
       const url = new URL(request.url);
       const backgroundKey = invitationBackgroundKey(url.pathname);
-      if (backgroundKey) return handleInvitationBackground(request, env, backgroundKey);
+      if (backgroundKey) {
+        try {
+          return await handleInvitationBackground(request, env, backgroundKey);
+        } catch (error) {
+          console.error('Invitation background storage failed.', error);
+          return response(request, env, 'Invitation background storage failed. Deploy the latest Worker and verify that its R2 bucket exists.', 503);
+        }
+      }
       if (url.pathname === '/anylist-sync' || url.pathname === '/anylist-sync/status') {
         if (!requireHost(request, env)) return jsonResponse(request, env, { error: 'host_authentication_failed' }, 401);
         if (url.pathname === '/anylist-sync' && request.method === 'POST') {

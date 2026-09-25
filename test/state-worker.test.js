@@ -47,3 +47,16 @@ test('invitation uploads reject an oversized body without a Content-Length heade
   assert.equal(await response.text(), 'Image is too large (15 MB maximum).');
   assert.equal(stored, false);
 });
+
+test('invitation storage failures return actionable setup guidance', async () => {
+  const env = {
+    HOST_PASSWORD: 'secret',
+    INVITATION_BACKGROUNDS: { async put() { throw new Error('No such bucket'); } }
+  };
+
+  const response = await worker.fetch(uploadRequest(new Uint8Array([1, 2, 3])), env);
+
+  assert.equal(response.status, 503);
+  assert.match(await response.text(), /Deploy the latest Worker/);
+  assert.match(response.headers.get('Access-Control-Allow-Origin'), /\*/);
+});
