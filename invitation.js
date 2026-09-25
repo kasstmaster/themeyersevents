@@ -1,140 +1,133 @@
 (function (root) {
   'use strict';
 
-  const DEFAULTS = Object.freeze({
-    rsvpDate: '2026-11-14',
-    addressLine1: '221 W China Grade Loop',
-    addressLine2: 'Bakersfield CA 93308'
+  const FIELD_DEFINITIONS = Object.freeze({
+    eventDate: { label: 'Event Date', type: 'text', formatter: 'weekday-month-ordinal-year' },
+    rsvpBy: { label: 'RSVP By', type: 'text', formatter: 'by-short-month-day' },
+    addressLine1: { label: 'Address Line 1', type: 'text', formatter: 'plain' },
+    addressLine2: { label: 'Address Line 2', type: 'text', formatter: 'plain' },
+    venueName: { label: 'Venue Name', type: 'text', formatter: 'plain' },
+    churchName: { label: 'Church Name', type: 'text', formatter: 'plain' },
+    ceremonyTime: { label: 'Ceremony Time', type: 'text', formatter: 'plain' },
+    receptionLocation: { label: 'Reception Location', type: 'text', formatter: 'plain' },
+    cityStateZip: { label: 'City / State / ZIP', type: 'text', formatter: 'plain' },
+    customText: { label: 'Custom Text', type: 'text', formatter: 'plain' },
+    accountQr: { label: 'Account QR Code', type: 'qr' }
   });
+  const FONT_FAMILIES = Object.freeze(['Georgia', 'Times New Roman', 'serif', 'Arial', 'sans-serif']);
+  const EVENT_DATE_FORMATTERS = Object.freeze([
+    ['weekday-month-ordinal-year-spaced', 'Saturday   November   21st   2026'],
+    ['weekday-month-ordinal-year', 'Saturday November 21st 2026'],
+    ['month-ordinal-year', 'November 21st 2026'],
+    ['month-day-comma-year', 'November 21, 2026']
+  ]);
+  const RSVP_FORMATTERS = Object.freeze([['by-short-month-day', 'By Nov. 7'], ['short-month-day', 'Nov. 7'], ['month-day', 'November 7']]);
 
-  // Coordinates are in the attached 720 x 1008 PNG coordinate system.  Each
-  // mask covers only the replaceable pixels in the supplied master image.
-  const TEMPLATES = Object.freeze({
-    christmas: {
-      id: 'christmas', width: 720, height: 1008, image: 'assets/invitations/christmas-master.png.b64',
-      dateStyle: 'weekday-month-day-year', rsvpStyle: 'by-short-month-day',
-      fields: {
-        eventDate: { x: 104, y: 401, width: 514, height: 48, baseline: 433, font: 'italic 28px Georgia, "Times New Roman", serif', align: 'center', color: '#4d4a50', tracking: 0 },
-        addressLine1: { x: 119, y: 496, width: 482, height: 38, baseline: 526, font: 'italic 27px Georgia, "Times New Roman", serif', align: 'center', color: '#4d4a50', tracking: 0 },
-        addressLine2: { x: 133, y: 531, width: 454, height: 38, baseline: 560, font: 'italic 27px Georgia, "Times New Roman", serif', align: 'center', color: '#4d4a50', tracking: 0 },
-        rsvpBy: { x: 239, y: 840, width: 248, height: 42, baseline: 869, font: 'bold 22px Georgia, "Times New Roman", serif', align: 'center', color: '#4d4a50', tracking: 0 }
-      },
-      qr: { x: 562, y: 850, width: 158, height: 158, quietZone: 4 },
-      mask: '#f7f8f5'
-    },
-    thanksgiving: {
-      id: 'thanksgiving', width: 720, height: 1008, image: 'assets/invitations/thanksgiving-master.png.b64',
-      dateStyle: 'weekday-month-day-year-upper', rsvpStyle: 'by-short-month-day',
-      fields: {
-        eventDate: { x: 121, y: 421, width: 478, height: 43, baseline: 452, font: 'italic 27px Georgia, "Times New Roman", serif', align: 'center', color: '#4d4a50', tracking: .2 },
-        addressLine1: { x: 122, y: 516, width: 476, height: 38, baseline: 546, font: 'italic 27px Georgia, "Times New Roman", serif', align: 'center', color: '#4d4a50', tracking: 0 },
-        addressLine2: { x: 133, y: 551, width: 454, height: 38, baseline: 580, font: 'italic 27px Georgia, "Times New Roman", serif', align: 'center', color: '#4d4a50', tracking: 0 },
-        rsvpBy: { x: 239, y: 840, width: 248, height: 42, baseline: 871, font: 'bold 22px Georgia, "Times New Roman", serif', align: 'center', color: '#4d4a50', tracking: 0 }
-      },
-      qr: { x: 558, y: 846, width: 162, height: 162, quietZone: 4 },
-      mask: '#f5f3ed'
-    },
-    wedding: {
-      id: 'wedding', width: 720, height: 1008, image: 'assets/invitations/wedding-master.png.b64',
-      dateStyle: 'wedding-two-line', rsvpStyle: 'by-short-month-day',
-      fields: {
-        eventDate: { x: 133, y: 475, width: 454, height: 76, baseline: 505, secondBaseline: 540, font: '23px Georgia, "Times New Roman", serif', secondFont: 'italic 22px Georgia, "Times New Roman", serif', align: 'center', color: '#4d4a50', tracking: .5 },
-        addressLine1: { x: 175, y: 650, width: 370, height: 39, baseline: 681, font: 'italic 22px Georgia, "Times New Roman", serif', align: 'center', color: '#4d4a50', tracking: .4 },
-        addressLine2: { x: 165, y: 684, width: 390, height: 39, baseline: 714, font: 'italic 22px Georgia, "Times New Roman", serif', align: 'center', color: '#4d4a50', tracking: .4 },
-        rsvpBy: null
-      },
-      // The supplied wedding PNG contains no QR. This fixed, previously blank
-      // lower-right region avoids moving any source artwork or wording.
-      qr: { x: 553, y: 816, width: 120, height: 120, quietZone: 4 },
-      mask: '#faf8f8'
-    }
-  });
-
-  const monthLong = new Intl.DateTimeFormat('en-US', { month: 'long', timeZone: 'UTC' });
-  const monthShort = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' });
-  const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' });
-  const numberWords = ['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];
-  function underHundredWords(value) {
-    if (value < 20) return numberWords[value];
-    const tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
-    return `${tens[Math.floor(value / 10)]}${value % 10 ? `-${numberWords[value % 10]}` : ''}`;
-  }
-  function yearWords(year) {
-    if (year >= 2000 && year < 2100) return `Two thousand and ${underHundredWords(year - 2000)}`;
-    return String(year);
+  function id(prefix = 'template') {
+    const random = root.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return `${prefix}-${random}`;
   }
   function parseDate(value) {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
-    return match ? new Date(Date.UTC(+match[1], +match[2] - 1, +match[3], 12)) : null;
+    if (!match) return null;
+    const parts = { year: +match[1], month: +match[2], day: +match[3] };
+    const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 12));
+    return date.getUTCFullYear() === parts.year && date.getUTCMonth() === parts.month - 1 && date.getUTCDate() === parts.day ? date : null;
   }
-  function formatEventDate(templateId, value) {
-    const date = parseDate(value); if (!date) return '';
-    const template = TEMPLATES[templateId];
-    if (template.dateStyle === 'wedding-two-line') return [`${weekday.format(date).toUpperCase()}, ${date.getUTCDate()} OF ${monthLong.format(date).toUpperCase()}`, yearWords(date.getUTCFullYear()).replace(/^./, c => c.toUpperCase())];
-    const text = `${weekday.format(date)} ${monthLong.format(date).toUpperCase()} ${date.getUTCDate()} ${date.getUTCFullYear()}`;
-    return template.dateStyle.endsWith('-upper') ? text.toUpperCase() : text;
+  function ordinal(day) {
+    const remainder100 = day % 100;
+    if (remainder100 >= 11 && remainder100 <= 13) return `${day}th`;
+    return `${day}${({ 1: 'st', 2: 'nd', 3: 'rd' })[day % 10] || 'th'}`;
   }
-  function formatRsvpDate(value) {
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const shortMonths = ['Jan.', 'Feb.', 'Mar.', 'Apr.', 'May', 'Jun.', 'Jul.', 'Aug.', 'Sep.', 'Oct.', 'Nov.', 'Dec.'];
+  const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  function formatEventDate(value, formatter = 'weekday-month-ordinal-year') {
     const date = parseDate(value); if (!date) return '';
-    return `BY ${monthShort.format(date).toUpperCase()}. ${date.getUTCDate()}`;
+    const weekday = weekdays[date.getUTCDay()], month = months[date.getUTCMonth()], day = date.getUTCDate(), year = date.getUTCFullYear();
+    if (formatter === 'month-ordinal-year') return `${month} ${ordinal(day)} ${year}`;
+    if (formatter === 'month-day-comma-year') return `${month} ${day}, ${year}`;
+    return `${weekday} ${month} ${ordinal(day)} ${year}`;
+  }
+  function formatRsvpDate(value, formatter = 'by-short-month-day') {
+    const date = parseDate(value); if (!date) return '';
+    if (formatter === 'month-day') return `${months[date.getUTCMonth()]} ${date.getUTCDate()}`;
+    const short = `${shortMonths[date.getUTCMonth()]} ${date.getUTCDate()}`;
+    return formatter === 'short-month-day' ? short : `By ${short}`;
+  }
+  function newField(key, x, y) {
+    const definition = FIELD_DEFINITIONS[key] || FIELD_DEFINITIONS.customText;
+    const qr = definition.type === 'qr';
+    return {
+      id: id('field'), key, type: definition.type, label: definition.label,
+      x: Math.round(x), y: Math.round(y), width: qr ? 160 : 420, height: qr ? 160 : 48,
+      ...(qr ? { quietZone: 4 } : {
+        fontFamily: 'Georgia', fontSize: 28, fontWeight: '400', italic: false,
+        color: '#222222', textAlign: 'left', letterSpacing: 0, lineHeight: 1.2,
+        formatter: definition.formatter, customText: '', wordSpacing: definition.formatter.includes('spaced') ? 14 : 0
+      })
+    };
+  }
+  function createTemplate(name, background) {
+    const now = new Date().toISOString();
+    return { id: id(), name: String(name || 'Untitled template').trim(), background: { ...background }, fields: [], createdAt: now, updatedAt: now };
+  }
+  function duplicateTemplate(template, name = `${template.name} copy`) {
+    const copy = createTemplate(name, template.background);
+    copy.fields = template.fields.map(field => ({ ...field, id: id('field') }));
+    return copy;
+  }
+  function replaceBackground(template, background) {
+    const dimensionsChanged = template.background.width !== background.width || template.background.height !== background.height;
+    return { template: { ...template, background: { ...background }, updatedAt: new Date().toISOString() }, dimensionsChanged };
+  }
+  function fieldValue(field, eventState) {
+    const raw = field.key === 'rsvpBy' ? eventState.rsvpDate : field.key === 'customText' ? field.customText : eventState[field.key];
+    if (field.key === 'eventDate') return formatEventDate(raw, field.formatter);
+    if (field.key === 'rsvpBy') return formatRsvpDate(raw, field.formatter);
+    return String(raw || '');
+  }
+  function invitationModel(template, eventState, qrUrl) {
+    if (!template) throw new Error('This gathering has no invitation template assigned.');
+    return { template, values: Object.fromEntries(template.fields.filter(field => field.type === 'text').map(field => [field.id, fieldValue(field, eventState)])), qrUrl };
   }
   function filenameFor(accountName, eventName) {
     const safe = `${accountName}-${eventName}-Invitation`.normalize('NFKD').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '');
     return `${safe || 'Invitation'}.png`;
   }
-  function settings(eventState) { return { rsvpDate: eventState.rsvpDate || DEFAULTS.rsvpDate, addressLine1: eventState.addressLine1 || DEFAULTS.addressLine1, addressLine2: eventState.addressLine2 || DEFAULTS.addressLine2 }; }
-  function invitationModel(templateId, eventState, qrUrl) {
-    const template = TEMPLATES[templateId], values = settings(eventState);
-    return { template, values: { eventDate: formatEventDate(templateId, eventState.eventDate), rsvpBy: formatRsvpDate(values.rsvpDate), addressLine1: values.addressLine1, addressLine2: values.addressLine2 }, qrUrl };
+  function loadImage(src) {
+    return new Promise((resolve, reject) => { const image = new Image(); image.onload = () => resolve(image); image.onerror = () => reject(new Error('Unable to load invitation background.')); image.crossOrigin = 'anonymous'; image.src = src; });
   }
-  function trackedText(ctx, text, field, y, font = field.font) {
-    ctx.font = font; ctx.fillStyle = field.color; ctx.textAlign = field.align; ctx.textBaseline = 'alphabetic';
-    const x = field.align === 'center' ? field.x + field.width / 2 : field.x;
-    if (!field.tracking || !ctx.letterSpacing) ctx.fillText(text, x, y);
-    else { ctx.letterSpacing = `${field.tracking}px`; ctx.fillText(text, x, y); ctx.letterSpacing = '0px'; }
+  function drawText(ctx, text, field) {
+    ctx.save(); ctx.beginPath(); ctx.rect(field.x, field.y, field.width, field.height); ctx.clip();
+    ctx.font = `${field.italic ? 'italic ' : ''}${field.fontWeight || 400} ${field.fontSize}px ${JSON.stringify(field.fontFamily || 'Georgia')}, serif`;
+    ctx.fillStyle = field.color || '#222'; ctx.textAlign = field.textAlign || 'left'; ctx.textBaseline = 'top';
+    if ('letterSpacing' in ctx) ctx.letterSpacing = `${field.letterSpacing || 0}px`;
+    if ('wordSpacing' in ctx) ctx.wordSpacing = `${field.wordSpacing || 0}px`;
+    const x = field.textAlign === 'center' ? field.x + field.width / 2 : field.textAlign === 'right' ? field.x + field.width : field.x;
+    ctx.fillText(text, x, field.y, field.width); ctx.restore();
   }
-  async function loadImage(src) {
-    // Master artwork is committed as Base64 text because the review transport
-    // cannot carry binary files. Decode it only in memory; no derived copy is
-    // stored and the decoded bytes remain identical to the supplied PNG.
-    const response = await fetch(src);
-    if (!response.ok) throw new Error(`Unable to load invitation master: ${response.status}`);
-    const encoded = (await response.text()).replace(/\s/g, '');
-    const binary = atob(encoded), bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
-    const objectUrl = URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
-    return new Promise((resolve, reject) => {
-      const image = new Image();
-      image.onload = () => { URL.revokeObjectURL(objectUrl); resolve(image); };
-      image.onerror = error => { URL.revokeObjectURL(objectUrl); reject(error); };
-      image.src = objectUrl;
-    });
+  function drawQr(ctx, qr, field) {
+    const size = Math.min(field.width, field.height), count = qr.getModuleCount(), quiet = Math.max(4, field.quietZone || 4), modules = count + quiet * 2;
+    const moduleSize = Math.floor(size / modules), drawn = moduleSize * modules, left = Math.round(field.x + (size - drawn) / 2), top = Math.round(field.y + (size - drawn) / 2);
+    ctx.fillStyle = '#fff'; ctx.fillRect(left, top, drawn, drawn); ctx.fillStyle = '#000';
+    for (let row = 0; row < count; row += 1) for (let col = 0; col < count; col += 1) if (qr.isDark(row, col)) ctx.fillRect(left + (col + quiet) * moduleSize, top + (row + quiet) * moduleSize, moduleSize, moduleSize);
   }
   async function render(canvas, model, qr) {
-    const { template, values } = model, ctx = canvas.getContext('2d');
-    canvas.width = template.width; canvas.height = template.height;
-    ctx.drawImage(await loadImage(template.image), 0, 0, template.width, template.height);
-    Object.values(template.fields).filter(Boolean).forEach(field => { ctx.fillStyle = template.mask; ctx.fillRect(field.x, field.y, field.width, field.height); });
-    const dateField = template.fields.eventDate;
-    if (Array.isArray(values.eventDate)) { trackedText(ctx, values.eventDate[0], dateField, dateField.baseline); trackedText(ctx, values.eventDate[1], dateField, dateField.secondBaseline, dateField.secondFont); }
-    else trackedText(ctx, values.eventDate, dateField, dateField.baseline);
-    ['addressLine1', 'addressLine2', 'rsvpBy'].forEach(key => { const field = template.fields[key]; if (field) trackedText(ctx, values[key], field, field.baseline); });
-    const q = template.qr, count = qr.getModuleCount(), quiet = q.quietZone, modules = count + quiet * 2;
-    ctx.fillStyle = '#fff'; ctx.fillRect(q.x, q.y, q.width, q.height);
-    const scale = Math.min(q.width, q.height) / modules, left = q.x + (q.width - modules * scale) / 2, top = q.y + (q.height - modules * scale) / 2;
-    ctx.fillStyle = '#000';
-    for (let row = 0; row < count; row++) for (let col = 0; col < count; col++) if (qr.isDark(row, col)) ctx.fillRect(left + (col + quiet) * scale, top + (row + quiet) * scale, scale + .15, scale + .15);
+    const { template } = model, ctx = canvas.getContext('2d');
+    canvas.width = template.background.width; canvas.height = template.background.height;
+    ctx.drawImage(await loadImage(template.background.url), 0, 0, canvas.width, canvas.height);
+    template.fields.forEach(field => field.type === 'qr' ? drawQr(ctx, qr, field) : drawText(ctx, model.values[field.id], field));
     return canvas;
   }
   function overflowWarnings(canvas, model) {
-    const ctx = canvas.getContext('2d'), warnings = [];
-    Object.entries(model.template.fields).forEach(([key, field]) => {
-      if (!field) return; const value = model.values[key]; const lines = Array.isArray(value) ? value : [value];
-      lines.forEach((line, index) => { ctx.font = index ? (field.secondFont || field.font) : field.font; if (ctx.measureText(line).width + Math.max(0, line.length - 1) * (field.tracking || 0) > field.width) warnings.push(key); });
-    });
-    return [...new Set(warnings)];
+    const ctx = canvas.getContext('2d');
+    return model.template.fields.filter(field => field.type === 'text').filter(field => {
+      ctx.font = `${field.italic ? 'italic ' : ''}${field.fontWeight || 400} ${field.fontSize}px ${field.fontFamily || 'Georgia'}`;
+      const value = model.values[field.id] || '';
+      return ctx.measureText(value).width + Math.max(0, value.length - 1) * (field.letterSpacing || 0) + (value.split(' ').length - 1) * (field.wordSpacing || 0) > field.width;
+    }).map(field => field.label);
   }
-
-  root.Invitation = { TEMPLATES, DEFAULTS, parseDate, formatEventDate, formatRsvpDate, filenameFor, settings, invitationModel, render, overflowWarnings };
+  root.Invitation = { FIELD_DEFINITIONS, FONT_FAMILIES, EVENT_DATE_FORMATTERS, RSVP_FORMATTERS, parseDate, ordinal, formatEventDate, formatRsvpDate, newField, createTemplate, duplicateTemplate, replaceBackground, fieldValue, invitationModel, filenameFor, render, overflowWarnings };
   if (typeof module !== 'undefined') module.exports = root.Invitation;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

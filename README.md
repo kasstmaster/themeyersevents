@@ -66,6 +66,14 @@ automatically. Without a Worker URL, visitors can still read the same committed
 `data/app-state.json` on every device, while website edits remain local until
 you copy them into the file and commit it.
 
+Invitation template metadata and field coordinates use that shared JSON state.
+Uploaded PNG, JPEG, and WebP backgrounds are deliberately not put in either Git
+repository: the Worker stores their bytes in its `INVITATION_BACKGROUNDS` R2
+bucket. Before deploying, create it with
+`npx wrangler r2 bucket create meyers-invitation-backgrounds` (or change the
+binding's bucket name in `wrangler.toml`). The browser saves only the runtime
+background URL, media type, and original pixel dimensions in template records.
+
 If GitHub or the worker is temporarily unavailable, the change remains in that
 browser and the site shows a sync warning. Make another change after service is
 restored to commit the latest complete state. The repository remains the durable

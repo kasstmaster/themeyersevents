@@ -87,6 +87,7 @@ function initialAppState() {
     accountResetVersion: ACCOUNT_RESET_VERSION,
     signupResetVersion: SIGNUP_RESET_VERSION,
     accounts: structuredClone(GUEST_ACCOUNTS),
+    invitationTemplates: [],
     events: {
       thanksgiving: makeEvent(structuredClone(defaultItems), DEFAULT_EVENT_DATE),
       christmas: makeEvent(christmasItems(), DEFAULT_CHRISTMAS_DATE, CHRISTMAS_MENU_VERSION),
@@ -149,7 +150,8 @@ function normalizeState(saved) {
             ]))
           };
         }),
-        events: { ...fresh.events, ...saved.events }
+        events: { ...fresh.events, ...saved.events },
+        invitationTemplates: Array.isArray(saved.invitationTemplates) ? saved.invitationTemplates : []
       };
       if (!loaded.activeEventIds.length && loaded.activeEventId) loaded.activeEventIds = [loaded.activeEventId];
       loaded.activeEventId = loaded.activeEventIds[0] || loaded.activeEventId;
@@ -190,6 +192,7 @@ function normalizeState(saved) {
         eventState.rsvpDate = typeof eventState.rsvpDate === 'string' ? eventState.rsvpDate : invitationFallback.rsvpDate;
         eventState.addressLine1 = typeof eventState.addressLine1 === 'string' ? eventState.addressLine1 : invitationFallback.addressLine1;
         eventState.addressLine2 = typeof eventState.addressLine2 === 'string' ? eventState.addressLine2 : invitationFallback.addressLine2;
+        eventState.invitationTemplateId = typeof eventState.invitationTemplateId === 'string' ? eventState.invitationTemplateId : '';
         eventState.quantityUnits = Array.isArray(eventState.quantityUnits) && eventState.quantityUnits.length
           ? eventState.quantityUnits.filter(unit => unit && typeof unit.id === 'string' && typeof unit.label === 'string')
           : structuredClone(DEFAULT_QUANTITY_UNITS);
@@ -242,7 +245,8 @@ function stateRecoveryScore(candidate) {
   const accounts = candidate.accounts?.length || 0;
   const rsvps = events.reduce((total, event) => total + (event.rsvps?.length || 0), 0);
   const claims = events.reduce((total, event) => total + (event.items || []).reduce((sum, item) => sum + (item.claims?.length || 0), 0), 0);
-  return accounts * 10000 + rsvps * 100 + claims;
+  const templates = candidate.invitationTemplates?.length || 0;
+  return accounts * 10000 + templates * 1000 + rsvps * 100 + claims;
 }
 function storeLocalState(nextState) {
   try {
@@ -524,11 +528,13 @@ function invitationQrUrl(account) {
 }
 function canvasBlob(canvas) { return new Promise(resolve => canvas.toBlob(resolve, 'image/png')); }
 async function renderInvitation(canvas, account) {
-  const model = window.Invitation.invitationModel(viewedEventId, state, invitationQrUrl(account));
+  const template = appState.invitationTemplates.find(item => item.id === state.invitationTemplateId);
+  const model = window.Invitation.invitationModel(template, state, invitationQrUrl(account));
   await window.Invitation.render(canvas, model, makeQrCode(model.qrUrl));
   return model;
 }
 async function openInvitationPreview(account = invitationAccounts()[0] || null) {
+  if (!state.invitationTemplateId) { showToast('Assign an invitation template to this gathering first.'); return; }
   invitationPreviewAccount = account;
   document.querySelector('#invitationPreviewHeading').textContent = `${EVENT_DETAILS[viewedEventId].name} invitation`;
   document.querySelector('#invitationPreviewAccount').textContent = account ? `Previewing the QR for ${account.name}. The account name is not printed.` : 'Previewing an explicit sample QR. No account name is printed.';
@@ -1021,9 +1027,11 @@ function openAccountsAdmin() {
   document.querySelector('#accountsDescription').textContent = `Account names and Always Invite are shared by every event. Can sign in applies only to ${EVENT_DETAILS[viewedEventId].name}.`;
   document.querySelector('#invitationAdminHeading').textContent = `${EVENT_DETAILS[viewedEventId].name} invitation`;
   document.querySelector('#invitationEventDate').value = state.eventDate;
-  document.querySelector('#invitationRsvpDate').value = state.rsvpDate || window.Invitation.settings(state).rsvpDate;
-  document.querySelector('#invitationAddress1').value = state.addressLine1 || window.Invitation.DEFAULTS.addressLine1;
-  document.querySelector('#invitationAddress2').value = state.addressLine2 || window.Invitation.DEFAULTS.addressLine2;
+  const invitationFallback = defaultInvitationSettings(state.eventDate);
+  document.querySelector('#invitationRsvpDate').value = state.rsvpDate || invitationFallback.rsvpDate;
+  document.querySelector('#invitationAddress1').value = state.addressLine1 || invitationFallback.addressLine1;
+  document.querySelector('#invitationAddress2').value = state.addressLine2 || invitationFallback.addressLine2;
+  document.querySelector('#invitationTemplateAssignment').innerHTML = '<option value="">No template assigned</option>' + appState.invitationTemplates.map(template => `<option value="${escapeAttribute(template.id)}" ${template.id === state.invitationTemplateId ? 'selected' : ''}>${escapeHtml(template.name)}</option>`).join('');
   const sortedAccounts = appState.accounts.map((account, index) => ({ account, index })).sort((left, right) =>
     firstAccountLastName(left.account.name).localeCompare(firstAccountLastName(right.account.name), 'en-US', { sensitivity: 'base' })
     || left.account.name.localeCompare(right.account.name, 'en-US', { sensitivity: 'base' }));
@@ -1109,9 +1117,157 @@ document.querySelector('#hostToolsButton').addEventListener('click', () => {
     state[key] = value; saveState(); openAccountsAdmin(); showToast('Invitation setting updated.');
   });
 });
+document.querySelector('#invitationTemplateAssignment').addEventListener('change', event => {
+  state.invitationTemplateId = event.target.value; saveState(); showToast('Invitation template assignment updated.');
+});
 document.querySelector('#downloadInvitationPng').addEventListener('click', async () => {
   if (invitationPreviewAccount) await downloadInvitation(invitationPreviewAccount);
   else showToast('Choose an invited account to download its invitation.');
+});
+document.querySelector('#downloadAllInvitations').addEventListener('click', async () => {
+  if (!state.invitationTemplateId) { showToast('Assign an invitation template first.'); return; }
+  for (const account of invitationAccounts()) { await downloadInvitation(account); await new Promise(resolve => setTimeout(resolve, 150)); }
+});
+
+let templateDraft = null;
+let selectedTemplateFieldId = '';
+let pendingTemplateFieldKey = '';
+function templateAssetUrl(id) { return `${SHARED_STATE_URL.replace(/\/$/, '')}/invitation-backgrounds/${encodeURIComponent(id)}`; }
+async function backgroundMetadata(file) {
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(file?.type)) throw new Error('Choose a PNG, JPEG, or WebP image.');
+  const bitmap = await createImageBitmap(file);
+  const result = { width: bitmap.width, height: bitmap.height, contentType: file.type };
+  bitmap.close();
+  if (!result.width || !result.height) throw new Error('The image dimensions could not be read.');
+  return result;
+}
+async function uploadTemplateBackground(templateId, file) {
+  if (!SHARED_STATE_URL) throw new Error('Configure the shared-state Worker before uploading invitation artwork.');
+  const metadata = await backgroundMetadata(file);
+  const response = await fetchWithTimeout(templateAssetUrl(templateId), { method: 'PUT', headers: { 'Content-Type': file.type, 'X-Host-Password': hostCredential }, body: file });
+  if (!response.ok) throw new Error(await response.text() || `Background upload failed (${response.status}).`);
+  return { ...metadata, url: templateAssetUrl(templateId), updatedAt: new Date().toISOString() };
+}
+function renderTemplateManager() {
+  const list = document.querySelector('#invitationTemplateList');
+  list.innerHTML = appState.invitationTemplates.length ? appState.invitationTemplates.map(template => `<article><div><strong>${escapeHtml(template.name)}</strong><span>${template.background.width} × ${template.background.height}px</span></div><div><button type="button" data-template-edit="${escapeAttribute(template.id)}">Edit</button><button type="button" data-template-duplicate="${escapeAttribute(template.id)}">Duplicate</button><button type="button" data-template-delete="${escapeAttribute(template.id)}">Delete</button></div></article>`).join('') : '<p>No invitation templates yet.</p>';
+  list.querySelectorAll('[data-template-edit]').forEach(button => button.addEventListener('click', () => openTemplateEditor(button.dataset.templateEdit)));
+  list.querySelectorAll('[data-template-duplicate]').forEach(button => button.addEventListener('click', () => {
+    const source = appState.invitationTemplates.find(template => template.id === button.dataset.templateDuplicate);
+    appState.invitationTemplates.push(window.Invitation.duplicateTemplate(source)); saveState(); renderTemplateManager();
+  }));
+  list.querySelectorAll('[data-template-delete]').forEach(button => button.addEventListener('click', async () => {
+    const id = button.dataset.templateDelete;
+    if (!confirm('Delete this template? Gathering data and accounts will not be deleted.')) return;
+    const deleted = appState.invitationTemplates.find(template => template.id === id);
+    appState.invitationTemplates = appState.invitationTemplates.filter(template => template.id !== id);
+    Object.values(appState.events).forEach(event => { if (event.invitationTemplateId === id) event.invitationTemplateId = ''; });
+    const backgroundStillUsed = appState.invitationTemplates.some(template => template.background.url === deleted?.background.url);
+    if (SHARED_STATE_URL && deleted && !backgroundStillUsed) fetch(deleted.background.url, { method: 'DELETE', headers: { 'X-Host-Password': hostCredential } }).catch(console.error);
+    saveState(); renderTemplateManager();
+  }));
+}
+function openTemplateManager() { document.querySelector('#hostToolsDialog').close(); renderTemplateManager(); document.querySelector('#invitationTemplatesDialog').showModal(); }
+document.querySelector('#invitationTemplatesButton').addEventListener('click', openTemplateManager);
+document.querySelector('#createTemplateButton').addEventListener('click', async () => {
+  const error = document.querySelector('#templateManagerError'), name = document.querySelector('#newTemplateName').value.trim(), file = document.querySelector('#newTemplateBackground').files[0];
+  error.textContent = '';
+  try {
+    if (!name) throw new Error('Enter a template name.'); if (!file) throw new Error('Choose a background image.');
+    const template = window.Invitation.createTemplate(name, { width: 1, height: 1, contentType: file.type, url: '' });
+    template.background = await uploadTemplateBackground(template.id, file);
+    appState.invitationTemplates.push(template); saveState(); renderTemplateManager();
+    document.querySelector('#newTemplateName').value = ''; document.querySelector('#newTemplateBackground').value = '';
+    openTemplateEditor(template.id);
+  } catch (caught) { error.textContent = caught.message; }
+});
+function editorScale() {
+  const stage = document.querySelector('#templateCanvasStage');
+  return stage.getBoundingClientRect().width / templateDraft.background.width;
+}
+function previewValue(field) {
+  if (field.type === 'qr') return '';
+  return window.Invitation.fieldValue(field, state) || field.label;
+}
+function renderEditorFields() {
+  const layer = document.querySelector('#templateFieldLayer');
+  layer.innerHTML = templateDraft.fields.map(field => `<div class="editor-field ${field.type} ${field.id === selectedTemplateFieldId ? 'selected' : ''}" data-field-id="${field.id}" style="left:${field.x}px;top:${field.y}px;width:${field.width}px;height:${field.height}px;${field.type === 'text' ? `font-family:${escapeAttribute(field.fontFamily)};font-size:${field.fontSize}px;font-weight:${field.fontWeight};font-style:${field.italic ? 'italic' : 'normal'};color:${field.color};text-align:${field.textAlign};letter-spacing:${field.letterSpacing}px;line-height:${field.lineHeight};word-spacing:${field.wordSpacing || 0}px` : ''}">${field.type === 'qr' ? '<span>Sample account QR</span><span class="sample-qr">▦</span>' : escapeHtml(previewValue(field))}<button class="resize-handle" type="button" aria-label="Resize field"></button></div>`).join('');
+  layer.querySelectorAll('.editor-field').forEach(element => {
+    element.addEventListener('pointerdown', event => beginFieldPointer(event, element));
+    element.addEventListener('click', event => { event.stopPropagation(); selectedTemplateFieldId = element.dataset.fieldId; renderEditorFields(); renderFieldInspector(); });
+  });
+  const overflowing = [...layer.querySelectorAll('.editor-field:not(.qr)')].filter(element => element.scrollWidth > element.clientWidth).map(element => templateDraft.fields.find(field => field.id === element.dataset.fieldId)?.label);
+  document.querySelector('#templateOverflowWarning').textContent = overflowing.length ? `Text exceeds its field width: ${overflowing.join(', ')}.` : '';
+}
+function beginFieldPointer(event, element) {
+  event.stopPropagation(); event.preventDefault(); selectedTemplateFieldId = element.dataset.fieldId;
+  const field = templateDraft.fields.find(item => item.id === selectedTemplateFieldId), resizing = event.target.classList.contains('resize-handle');
+  const start = { x: event.clientX, y: event.clientY, fieldX: field.x, fieldY: field.y, width: field.width, height: field.height }, scale = editorScale();
+  element.setPointerCapture(event.pointerId);
+  element.onpointermove = move => {
+    const dx = (move.clientX - start.x) / scale, dy = (move.clientY - start.y) / scale;
+    if (resizing) { const size = field.type === 'qr' ? Math.max(64, start.width + Math.max(dx, dy)) : null; field.width = Math.round(size || Math.max(40, start.width + dx)); field.height = Math.round(size || Math.max(24, start.height + dy)); }
+    else { field.x = Math.round(Math.max(0, Math.min(templateDraft.background.width - field.width, start.fieldX + dx))); field.y = Math.round(Math.max(0, Math.min(templateDraft.background.height - field.height, start.fieldY + dy))); }
+    element.style.left = `${field.x}px`; element.style.top = `${field.y}px`; element.style.width = `${field.width}px`; element.style.height = `${field.height}px`; renderFieldInspector();
+  };
+  element.onpointerup = () => { element.onpointermove = null; element.onpointerup = null; renderEditorFields(); };
+  renderFieldInspector();
+}
+function renderFieldInspector() {
+  const inspector = document.querySelector('#fieldInspector'), field = templateDraft.fields.find(item => item.id === selectedTemplateFieldId);
+  if (!field) { inspector.innerHTML = '<h3>Field settings</h3><p>Select a placed field.</p>'; return; }
+  const numeric = (key, label, step = 1) => `<label>${label}<input data-field-setting="${key}" type="number" step="${step}" value="${field[key]}"></label>`;
+  inspector.innerHTML = `<h3>${escapeHtml(field.label)}</h3><div class="inspector-grid">${numeric('x', 'X')}${numeric('y', 'Y')}${numeric('width', 'Width')}${numeric('height', 'Height')}${field.type === 'text' ? `<label>Font<select data-field-setting="fontFamily">${window.Invitation.FONT_FAMILIES.map(font => `<option ${font === field.fontFamily ? 'selected' : ''}>${font}</option>`).join('')}</select></label>${numeric('fontSize', 'Font size')}${numeric('letterSpacing', 'Letter spacing', .1)}${numeric('lineHeight', 'Line height', .1)}<label>Weight<select data-field-setting="fontWeight"><option value="400">Regular</option><option value="600" ${field.fontWeight === '600' ? 'selected' : ''}>Semibold</option><option value="700" ${field.fontWeight === '700' ? 'selected' : ''}>Bold</option></select></label><label>Alignment<select data-field-setting="textAlign"><option>left</option><option ${field.textAlign === 'center' ? 'selected' : ''}>center</option><option ${field.textAlign === 'right' ? 'selected' : ''}>right</option></select></label><label>Color<input data-field-setting="color" type="color" value="${field.color}"></label><label class="check"><input data-field-setting="italic" type="checkbox" ${field.italic ? 'checked' : ''}> Italic</label>${field.key === 'eventDate' ? `<label>Format<select data-field-setting="formatter">${window.Invitation.EVENT_DATE_FORMATTERS.map(([value, label]) => `<option value="${value}" ${value === field.formatter ? 'selected' : ''}>${label}</option>`).join('')}</select></label>` : ''}${field.key === 'rsvpBy' ? `<label>Format<select data-field-setting="formatter">${window.Invitation.RSVP_FORMATTERS.map(([value, label]) => `<option value="${value}" ${value === field.formatter ? 'selected' : ''}>${label}</option>`).join('')}</select></label>` : ''}${field.key === 'customText' ? `<label>Text<input data-field-setting="customText" value="${escapeAttribute(field.customText)}"></label>` : ''}` : '<p>QR resizing always preserves a square aspect ratio and a four-module quiet zone.</p>'}</div><button id="deleteTemplateField" type="button">Delete Field</button>`;
+  inspector.querySelectorAll('[data-field-setting]').forEach(input => input.addEventListener('input', () => {
+    const key = input.dataset.fieldSetting; field[key] = input.type === 'checkbox' ? input.checked : input.type === 'number' ? Number(input.value) : input.value;
+    if (field.type === 'qr' && (key === 'width' || key === 'height')) field.width = field.height = Number(input.value);
+    if (key === 'formatter') field.wordSpacing = input.value.endsWith('-spaced') ? 14 : 0;
+    renderEditorFields();
+  }));
+  document.querySelector('#deleteTemplateField').addEventListener('click', () => { templateDraft.fields = templateDraft.fields.filter(item => item.id !== field.id); selectedTemplateFieldId = ''; renderEditorFields(); renderFieldInspector(); });
+}
+function sizeEditorStage() {
+  const viewport = document.querySelector('#templateCanvasViewport'), stage = document.querySelector('#templateCanvasStage');
+  const scale = Math.min(1, viewport.clientWidth / templateDraft.background.width, 680 / templateDraft.background.height);
+  stage.style.width = `${templateDraft.background.width}px`; stage.style.height = `${templateDraft.background.height}px`; stage.style.transform = `scale(${scale})`; viewport.style.height = `${templateDraft.background.height * scale}px`;
+}
+function openTemplateEditor(id) {
+  const template = appState.invitationTemplates.find(item => item.id === id); if (!template) return;
+  templateDraft = structuredClone(template); selectedTemplateFieldId = ''; pendingTemplateFieldKey = '';
+  document.querySelector('#templateEditorHeading').textContent = templateDraft.name;
+  document.querySelector('#templateEditorName').value = templateDraft.name;
+  document.querySelector('#templateBackgroundPreview').src = `${templateDraft.background.url}?v=${encodeURIComponent(templateDraft.background.updatedAt || '')}`;
+  document.querySelector('#templateFieldToolbox').innerHTML = Object.entries(window.Invitation.FIELD_DEFINITIONS).map(([key, definition]) => `<button type="button" data-field-key="${key}">${definition.label}</button>`).join('');
+  document.querySelectorAll('[data-field-key]').forEach(button => button.addEventListener('click', () => { pendingTemplateFieldKey = button.dataset.fieldKey; document.querySelector('#placementHelp').textContent = `Click the invitation to place ${button.textContent}.`; }));
+  document.querySelector('#templatePreviewAccount').innerHTML = '<option value="">Sample QR</option>' + invitationAccounts().map(account => `<option value="${escapeAttribute(account.qrToken)}">${escapeHtml(account.name)}</option>`).join('');
+  document.querySelector('#invitationTemplatesDialog').close(); document.querySelector('#invitationEditorDialog').showModal();
+  requestAnimationFrame(() => { sizeEditorStage(); renderEditorFields(); renderFieldInspector(); });
+}
+document.querySelector('#templateCanvasStage').addEventListener('click', event => {
+  if (!pendingTemplateFieldKey) return;
+  const rect = event.currentTarget.getBoundingClientRect(), scale = editorScale();
+  const field = window.Invitation.newField(pendingTemplateFieldKey, (event.clientX - rect.left) / scale, (event.clientY - rect.top) / scale);
+  field.width = Math.min(field.width, templateDraft.background.width - field.x); field.height = Math.min(field.height, templateDraft.background.height - field.y);
+  templateDraft.fields.push(field); selectedTemplateFieldId = field.id; pendingTemplateFieldKey = ''; document.querySelector('#placementHelp').textContent = 'Choose another field or edit the selected field.'; renderEditorFields(); renderFieldInspector();
+});
+document.querySelector('#replaceTemplateBackground').addEventListener('change', async event => {
+  const error = document.querySelector('#templateEditorError'); error.textContent = '';
+  try {
+    const file = event.target.files[0]; if (!file) return; const metadata = await backgroundMetadata(file);
+    if ((metadata.width !== templateDraft.background.width || metadata.height !== templateDraft.background.height) && !confirm(`The new image is ${metadata.width} × ${metadata.height}, not ${templateDraft.background.width} × ${templateDraft.background.height}. Existing coordinates will be preserved, not stretched. Continue?`)) { event.target.value = ''; return; }
+    const background = await uploadTemplateBackground(templateDraft.id, file); templateDraft = window.Invitation.replaceBackground(templateDraft, background).template;
+    document.querySelector('#templateBackgroundPreview').src = `${background.url}?v=${encodeURIComponent(background.updatedAt)}`; sizeEditorStage(); renderEditorFields();
+    const index = appState.invitationTemplates.findIndex(template => template.id === templateDraft.id); appState.invitationTemplates[index] = structuredClone(templateDraft); saveState(); showToast('Background replaced and template saved.');
+  } catch (caught) { error.textContent = caught.message; }
+});
+document.querySelector('#saveTemplateButton').addEventListener('click', () => {
+  templateDraft.name = document.querySelector('#templateEditorName').value.trim() || templateDraft.name; templateDraft.updatedAt = new Date().toISOString(); const index = appState.invitationTemplates.findIndex(template => template.id === templateDraft.id); appState.invitationTemplates[index] = structuredClone(templateDraft); document.querySelector('#templateEditorHeading').textContent = templateDraft.name; saveState(); showToast('Invitation template saved.');
+});
+document.querySelector('#previewEditedTemplateButton').addEventListener('click', async () => {
+  const selectedToken = document.querySelector('#templatePreviewAccount').value;
+  const account = appState.accounts.find(item => item.qrToken === selectedToken) || null, canvas = document.querySelector('#invitationCanvas');
+  invitationPreviewAccount = account; const model = window.Invitation.invitationModel(templateDraft, state, invitationQrUrl(account));
+  await window.Invitation.render(canvas, model, makeQrCode(model.qrUrl)); document.querySelector('#invitationPreviewHeading').textContent = templateDraft.name; document.querySelector('#invitationPreviewAccount').textContent = account ? `Previewing ${account.name}'s existing account QR. The name is not printed.` : 'Previewing a sample QR.'; document.querySelector('#invitationPreviewDialog').showModal();
 });
 function openEventsAdmin() {
   document.querySelector('#eventChoices').innerHTML = Object.entries(EVENT_DETAILS).map(([id, event]) => {
