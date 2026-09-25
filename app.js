@@ -1133,6 +1133,9 @@ let templateDraft = null;
 let selectedTemplateFieldId = '';
 let pendingTemplateFieldKey = '';
 let newTemplateBackgroundFile = null;
+let templatePreviewObjectUrl = '';
+let templatePreviewLoadId = 0;
+let templateEditorResizeObserver = null;
 function templateAssetUrl(id) { return `${SHARED_STATE_URL.replace(/\/$/, '')}/invitation-backgrounds/${encodeURIComponent(id)}`; }
 async function backgroundMetadata(file) {
   if (!['image/png', 'image/jpeg', 'image/webp'].includes(file?.type)) throw new Error('Choose a PNG, JPEG, or WebP image.');
@@ -1187,7 +1190,7 @@ document.querySelector('#createTemplateButton').addEventListener('click', async 
     template.background = await uploadTemplateBackground(template.id, file);
     appState.invitationTemplates.push(template); saveState(); renderTemplateManager();
     document.querySelector('#newTemplateName').value = ''; document.querySelector('#newTemplateBackground').value = ''; newTemplateBackgroundFile = null; updateDropzone(document.querySelector('#newTemplateDropzone'), null);
-    openTemplateEditor(template.id);
+    openTemplateEditor(template.id, file);
   } catch (caught) { error.textContent = caught.message; }
 });
 function editorScale() {
@@ -1237,21 +1240,63 @@ function renderFieldInspector() {
 }
 function sizeEditorStage() {
   const viewport = document.querySelector('#templateCanvasViewport'), stage = document.querySelector('#templateCanvasStage');
-  const scale = Math.min(1, viewport.clientWidth / templateDraft.background.width, 680 / templateDraft.background.height);
-  stage.style.width = `${templateDraft.background.width}px`; stage.style.height = `${templateDraft.background.height}px`; stage.style.transform = `scale(${scale})`; viewport.style.height = `${templateDraft.background.height * scale}px`;
+  if (!templateDraft || !viewport.parentElement.clientWidth) return;
+  const width = Number(templateDraft.background.width), height = Number(templateDraft.background.height);
+  if (!width || !height) return;
+  const scale = Math.min(1, viewport.parentElement.clientWidth / width, 680 / height);
+  const displayedWidth = Math.max(1, Math.round(width * scale)), displayedHeight = Math.max(1, Math.round(height * scale));
+  viewport.style.width = `${displayedWidth}px`; viewport.style.height = `${displayedHeight}px`;
+  stage.style.width = `${width}px`; stage.style.height = `${height}px`; stage.style.transform = `scale(${scale})`;
 }
-function openTemplateEditor(id) {
+async function loadTemplateBackgroundPreview(background, localFile = null) {
+  const image = document.querySelector('#templateBackgroundPreview'), error = document.querySelector('#templateEditorError'), status = document.querySelector('#templateBackgroundStatus');
+  const loadId = ++templatePreviewLoadId;
+  error.textContent = '';
+  image.removeAttribute('src');
+  image.classList.add('loading');
+  status.hidden = false;
+  status.textContent = 'Loading background…';
+  try {
+    let objectUrl;
+    if (localFile) objectUrl = URL.createObjectURL(localFile);
+    else {
+      const separator = background.url.includes('?') ? '&' : '?';
+      const response = await fetch(`${background.url}${separator}v=${encodeURIComponent(background.updatedAt || Date.now())}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Background request failed (${response.status}).`);
+      objectUrl = URL.createObjectURL(await response.blob());
+    }
+    if (loadId !== templatePreviewLoadId) { URL.revokeObjectURL(objectUrl); return; }
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = () => reject(new Error('The uploaded image could not be displayed.'));
+      image.src = objectUrl;
+    });
+    if (templatePreviewObjectUrl) URL.revokeObjectURL(templatePreviewObjectUrl);
+    templatePreviewObjectUrl = objectUrl;
+    image.classList.remove('loading');
+    status.hidden = true;
+    sizeEditorStage();
+  } catch (caught) {
+    if (loadId !== templatePreviewLoadId) return;
+    image.classList.remove('loading');
+    status.textContent = 'Background preview unavailable';
+    error.textContent = `Unable to load the template background. ${caught.message}`;
+  }
+}
+function openTemplateEditor(id, localFile = null) {
   const template = appState.invitationTemplates.find(item => item.id === id); if (!template) return;
   templateDraft = structuredClone(template); selectedTemplateFieldId = ''; pendingTemplateFieldKey = '';
   document.querySelector('#replaceTemplateBackground').value = ''; updateDropzone(document.querySelector('#replaceTemplateDropzone'), null);
   document.querySelector('#templateEditorHeading').textContent = templateDraft.name;
   document.querySelector('#templateEditorName').value = templateDraft.name;
-  document.querySelector('#templateBackgroundPreview').src = `${templateDraft.background.url}?v=${encodeURIComponent(templateDraft.background.updatedAt || '')}`;
   document.querySelector('#templateFieldToolbox').innerHTML = Object.entries(window.Invitation.FIELD_DEFINITIONS).map(([key, definition]) => `<button type="button" data-field-key="${key}">${definition.label}</button>`).join('');
   document.querySelectorAll('[data-field-key]').forEach(button => button.addEventListener('click', () => { pendingTemplateFieldKey = button.dataset.fieldKey; document.querySelector('#placementHelp').textContent = `Click the invitation to place ${button.textContent}.`; }));
   document.querySelector('#templatePreviewAccount').innerHTML = '<option value="">Sample QR</option>' + invitationAccounts().map(account => `<option value="${escapeAttribute(account.qrToken)}">${escapeHtml(account.name)}</option>`).join('');
   document.querySelector('#invitationTemplatesDialog').close(); document.querySelector('#invitationEditorDialog').showModal();
-  requestAnimationFrame(() => { sizeEditorStage(); renderEditorFields(); renderFieldInspector(); });
+  if (templateEditorResizeObserver) templateEditorResizeObserver.disconnect();
+  templateEditorResizeObserver = new ResizeObserver(sizeEditorStage);
+  templateEditorResizeObserver.observe(document.querySelector('.template-canvas-column'));
+  requestAnimationFrame(() => requestAnimationFrame(() => { sizeEditorStage(); renderEditorFields(); renderFieldInspector(); loadTemplateBackgroundPreview(templateDraft.background, localFile); }));
 }
 document.querySelector('#templateCanvasStage').addEventListener('click', event => {
   if (!pendingTemplateFieldKey) return;
@@ -1266,7 +1311,7 @@ async function replaceTemplateBackground(file) {
     if (!file) return; const metadata = await backgroundMetadata(file);
     if ((metadata.width !== templateDraft.background.width || metadata.height !== templateDraft.background.height) && !confirm(`The new image is ${metadata.width} × ${metadata.height}, not ${templateDraft.background.width} × ${templateDraft.background.height}. Existing coordinates will be preserved, not stretched. Continue?`)) return;
     const background = await uploadTemplateBackground(templateDraft.id, file); templateDraft = window.Invitation.replaceBackground(templateDraft, background).template;
-    document.querySelector('#templateBackgroundPreview').src = `${background.url}?v=${encodeURIComponent(background.updatedAt)}`; sizeEditorStage(); renderEditorFields();
+    await loadTemplateBackgroundPreview(background, file); renderEditorFields();
     const index = appState.invitationTemplates.findIndex(template => template.id === templateDraft.id); appState.invitationTemplates[index] = structuredClone(templateDraft); saveState(); showToast('Background replaced and template saved.');
   } catch (caught) { error.textContent = caught.message; }
 }
