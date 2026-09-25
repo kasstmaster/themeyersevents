@@ -1,0 +1,3 @@
+
+# Invitation master PNGs are losslessly encoded for text-only review.
+*.b64 text
