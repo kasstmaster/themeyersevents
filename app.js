@@ -1019,9 +1019,14 @@ function openQrCode(account) {
   document.querySelector('#qrAccountName').textContent = account.name;
   const preview = document.querySelector('#qrCodePreview');
   const unavailable = document.querySelector('#qrCodeUnavailable');
+  const linkWrapper = document.querySelector('#qrSignInLinkWrapper');
+  const signInLink = document.querySelector('#qrSignInLink');
   const buttons = [document.querySelector('#downloadQrPng'), document.querySelector('#downloadQrSvg')];
   preview.innerHTML = account.qrToken ? qrSvg(makeQrCode(accountQrUrl(account))) : '';
   unavailable.hidden = Boolean(account.qrToken);
+  linkWrapper.hidden = !account.qrToken;
+  signInLink.href = account.qrToken ? accountQrUrl(account) : '';
+  signInLink.textContent = account.qrToken ? accountQrUrl(account) : '';
   buttons.forEach(button => { button.disabled = !account.qrToken; });
   document.querySelector('#qrCodeDialog').showModal();
 }

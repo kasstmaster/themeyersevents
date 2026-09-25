@@ -159,7 +159,8 @@ need no separate migration: run **Sync AnyList Address Book** once to backfill
 older accounts.
 
 Hosts can then select **QR** beside an account in **Manage accounts** to preview
-its code and download a transparent PNG or SVG. The QR contains only a GitHub
+its code, download a transparent PNG or SVG, or open and copy the clickable
+sign-in link shown below the download buttons. The QR contains only a GitHub
 Pages-compatible route in the form
 `#/signin/account/<secure-random-token>`—never an account ID or guest name. That
 page still requires the guest's first name, last name, and optional suffix. It
