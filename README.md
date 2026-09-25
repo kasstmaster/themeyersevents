@@ -65,6 +65,15 @@ state when the page opens, regains focus, and every 30 seconds.
    recovered from Git history. If there is no browser data to preserve, the
    first change starts from the defaults in `app.js`.
 
+To keep the Worker current after this one-time setup, add
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` under **Settings → Secrets
+and variables → Actions** in this website repository. The API token needs
+Workers Scripts edit and R2 edit access. Changes to `github-state-worker/` on
+`main` will then run the **Deploy shared-state Worker** workflow automatically;
+it creates the artwork bucket when needed and deploys the current Worker. The
+workflow can also be started manually from the Actions tab to resolve an
+“invitation upload endpoint is not deployed” message.
+
 The Worker is required for changes made *inside the website* to be committed
 automatically. Without a Worker URL, visitors can still read the same committed
 `data/app-state.json` on every device, while website edits remain local until

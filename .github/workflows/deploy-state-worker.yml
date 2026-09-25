@@ -1,0 +1,30 @@
+name: Deploy shared-state Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - github-state-worker/**
+      - .github/workflows/deploy-state-worker.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-shared-state-worker
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create R2 bucket if needed and deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: github-state-worker
+          preCommands: wrangler r2 bucket create meyers-invitation-backgrounds || echo "R2 bucket already exists"
+          command: deploy
