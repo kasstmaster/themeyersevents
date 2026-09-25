@@ -1132,6 +1132,7 @@ document.querySelector('#downloadAllInvitations').addEventListener('click', asyn
 let templateDraft = null;
 let selectedTemplateFieldId = '';
 let pendingTemplateFieldKey = '';
+let newTemplateBackgroundFile = null;
 function templateAssetUrl(id) { return `${SHARED_STATE_URL.replace(/\/$/, '')}/invitation-backgrounds/${encodeURIComponent(id)}`; }
 async function backgroundMetadata(file) {
   if (!['image/png', 'image/jpeg', 'image/webp'].includes(file?.type)) throw new Error('Choose a PNG, JPEG, or WebP image.');
@@ -1170,14 +1171,14 @@ function renderTemplateManager() {
 function openTemplateManager() { document.querySelector('#hostToolsDialog').close(); renderTemplateManager(); document.querySelector('#invitationTemplatesDialog').showModal(); }
 document.querySelector('#invitationTemplatesButton').addEventListener('click', openTemplateManager);
 document.querySelector('#createTemplateButton').addEventListener('click', async () => {
-  const error = document.querySelector('#templateManagerError'), name = document.querySelector('#newTemplateName').value.trim(), file = document.querySelector('#newTemplateBackground').files[0];
+  const error = document.querySelector('#templateManagerError'), name = document.querySelector('#newTemplateName').value.trim(), file = newTemplateBackgroundFile;
   error.textContent = '';
   try {
     if (!name) throw new Error('Enter a template name.'); if (!file) throw new Error('Choose a background image.');
     const template = window.Invitation.createTemplate(name, { width: 1, height: 1, contentType: file.type, url: '' });
     template.background = await uploadTemplateBackground(template.id, file);
     appState.invitationTemplates.push(template); saveState(); renderTemplateManager();
-    document.querySelector('#newTemplateName').value = ''; document.querySelector('#newTemplateBackground').value = '';
+    document.querySelector('#newTemplateName').value = ''; document.querySelector('#newTemplateBackground').value = ''; newTemplateBackgroundFile = null; updateDropzone(document.querySelector('#newTemplateDropzone'), null);
     openTemplateEditor(template.id);
   } catch (caught) { error.textContent = caught.message; }
 });
@@ -1234,6 +1235,7 @@ function sizeEditorStage() {
 function openTemplateEditor(id) {
   const template = appState.invitationTemplates.find(item => item.id === id); if (!template) return;
   templateDraft = structuredClone(template); selectedTemplateFieldId = ''; pendingTemplateFieldKey = '';
+  document.querySelector('#replaceTemplateBackground').value = ''; updateDropzone(document.querySelector('#replaceTemplateDropzone'), null);
   document.querySelector('#templateEditorHeading').textContent = templateDraft.name;
   document.querySelector('#templateEditorName').value = templateDraft.name;
   document.querySelector('#templateBackgroundPreview').src = `${templateDraft.background.url}?v=${encodeURIComponent(templateDraft.background.updatedAt || '')}`;
@@ -1250,16 +1252,28 @@ document.querySelector('#templateCanvasStage').addEventListener('click', event =
   field.width = Math.min(field.width, templateDraft.background.width - field.x); field.height = Math.min(field.height, templateDraft.background.height - field.y);
   templateDraft.fields.push(field); selectedTemplateFieldId = field.id; pendingTemplateFieldKey = ''; document.querySelector('#placementHelp').textContent = 'Choose another field or edit the selected field.'; renderEditorFields(); renderFieldInspector();
 });
-document.querySelector('#replaceTemplateBackground').addEventListener('change', async event => {
+async function replaceTemplateBackground(file) {
   const error = document.querySelector('#templateEditorError'); error.textContent = '';
   try {
-    const file = event.target.files[0]; if (!file) return; const metadata = await backgroundMetadata(file);
-    if ((metadata.width !== templateDraft.background.width || metadata.height !== templateDraft.background.height) && !confirm(`The new image is ${metadata.width} × ${metadata.height}, not ${templateDraft.background.width} × ${templateDraft.background.height}. Existing coordinates will be preserved, not stretched. Continue?`)) { event.target.value = ''; return; }
+    if (!file) return; const metadata = await backgroundMetadata(file);
+    if ((metadata.width !== templateDraft.background.width || metadata.height !== templateDraft.background.height) && !confirm(`The new image is ${metadata.width} × ${metadata.height}, not ${templateDraft.background.width} × ${templateDraft.background.height}. Existing coordinates will be preserved, not stretched. Continue?`)) return;
     const background = await uploadTemplateBackground(templateDraft.id, file); templateDraft = window.Invitation.replaceBackground(templateDraft, background).template;
     document.querySelector('#templateBackgroundPreview').src = `${background.url}?v=${encodeURIComponent(background.updatedAt)}`; sizeEditorStage(); renderEditorFields();
     const index = appState.invitationTemplates.findIndex(template => template.id === templateDraft.id); appState.invitationTemplates[index] = structuredClone(templateDraft); saveState(); showToast('Background replaced and template saved.');
   } catch (caught) { error.textContent = caught.message; }
-});
+}
+function updateDropzone(dropzone, file) {
+  dropzone.classList.toggle('has-file', Boolean(file));
+  dropzone.querySelector('span').innerHTML = file ? `<strong>${escapeHtml(file.name)}</strong>` : '<strong>Drop artwork here</strong> or choose a file';
+}
+function configureDropzone(dropzone, input, onFile) {
+  input.addEventListener('change', () => onFile(input.files[0] || null));
+  ['dragenter', 'dragover'].forEach(type => dropzone.addEventListener(type, event => { event.preventDefault(); if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'; dropzone.classList.add('drag-over'); }));
+  ['dragleave', 'drop'].forEach(type => dropzone.addEventListener(type, event => { event.preventDefault(); dropzone.classList.remove('drag-over'); }));
+  dropzone.addEventListener('drop', event => onFile([...event.dataTransfer.files].find(file => file.type.startsWith('image/')) || event.dataTransfer.files[0] || null));
+}
+configureDropzone(document.querySelector('#newTemplateDropzone'), document.querySelector('#newTemplateBackground'), file => { newTemplateBackgroundFile = file; updateDropzone(document.querySelector('#newTemplateDropzone'), file); });
+configureDropzone(document.querySelector('#replaceTemplateDropzone'), document.querySelector('#replaceTemplateBackground'), file => { updateDropzone(document.querySelector('#replaceTemplateDropzone'), file); replaceTemplateBackground(file); });
 document.querySelector('#saveTemplateButton').addEventListener('click', () => {
   templateDraft.name = document.querySelector('#templateEditorName').value.trim() || templateDraft.name; templateDraft.updatedAt = new Date().toISOString(); const index = appState.invitationTemplates.findIndex(template => template.id === templateDraft.id); appState.invitationTemplates[index] = structuredClone(templateDraft); document.querySelector('#templateEditorHeading').textContent = templateDraft.name; saveState(); showToast('Invitation template saved.');
 });
